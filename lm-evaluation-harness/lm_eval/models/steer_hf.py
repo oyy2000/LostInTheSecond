@@ -29,6 +29,11 @@ class SteerHFLM(HFLM):
         self.steer_lambda = _consume("steer_lambda", float, 0.0)
         self.steer_vec_path = _consume("steer_vec_path", str, None)
         self.steer_min_token = _consume("steer_min_token", int, 0)
+        self.steer_max_token = _consume("steer_max_token", int, 128)
+        self.steer_apply_mode = str(_consume("steer_apply_mode", str, "prefix")).lower()
+        self.steer_window_center = _consume("steer_window_center", int, 64)
+        self.steer_window_pre = _consume("steer_window_pre", int, 32)
+        self.steer_window_post = _consume("steer_window_post", int, 32)
         
         # ★ 关键参数：指定只干预哪一层
         self.steer_layer = _consume("steer_layer", int, None)
@@ -36,6 +41,8 @@ class SteerHFLM(HFLM):
         super().__init__(**kwargs)
 
         self.steering_vector = None
+        self._steer_hooks = []
+        self._decode_step = 0
         self._enabled = (self.steer_lambda != 0.0 and self.steer_vec_path is not None)
 
         if self._enabled:
@@ -75,6 +82,76 @@ class SteerHFLM(HFLM):
 
             except Exception as e:
                 raise ValueError(f"Failed to load or slice steering vector: {e}")
+
+    def _get_decoder_layers(self):
+        base_model = self.model
+        if hasattr(base_model, "model") and hasattr(base_model.model, "layers"):
+            return base_model.model.layers
+        if hasattr(base_model, "transformer") and hasattr(base_model.transformer, "h"):
+            return base_model.transformer.h
+        raise ValueError("Unsupported model architecture for steer_hf token-window steering")
+
+    def _should_apply_on_decode_step(self, decode_step: int) -> bool:
+        if self.steer_apply_mode == "all":
+            return True
+
+        if self.steer_apply_mode in {"prefix", "prefix128"}:
+            return self.steer_min_token <= decode_step < self.steer_max_token
+
+        if self.steer_apply_mode in {"step2_window", "window"}:
+            start = max(0, self.steer_window_center - self.steer_window_pre)
+            end = self.steer_window_center + self.steer_window_post + 1
+            return start <= decode_step < end
+
+        return self.steer_min_token <= decode_step < self.steer_max_token
+
+    def _make_layer_hook(self, layer_idx: int):
+        layer_vec = self.steering_vector.layer_activations[layer_idx]
+
+        def _hook(_module, _input, output):
+            hidden = output[0] if isinstance(output, tuple) else output
+            if hidden is None or not torch.is_tensor(hidden) or hidden.ndim != 3:
+                return output
+
+            seq_len = hidden.shape[1]
+            if seq_len != 1:
+                return output
+
+            current_step = self._decode_step
+            if layer_idx == min(self.steering_vector.layer_activations.keys()):
+                self._decode_step += 1
+
+            if not self._should_apply_on_decode_step(current_step):
+                return output
+
+            vec = layer_vec.to(device=hidden.device, dtype=hidden.dtype)
+            if vec.ndim == 2:
+                vec = vec.squeeze(0)
+            if vec.ndim != 1:
+                return output
+
+            delta = (self.steer_lambda * vec).view(1, 1, -1)
+            steered = hidden.clone()
+            steered[:, -1:, :] = steered[:, -1:, :] + delta
+
+            if isinstance(output, tuple):
+                return (steered,) + output[1:]
+            return steered
+
+        return _hook
+
+    def _register_steer_hooks(self):
+        self._decode_step = 0
+        self._steer_hooks = []
+        layers = self._get_decoder_layers()
+        for layer_idx in self.steering_vector.layer_activations.keys():
+            handle = layers[layer_idx].register_forward_hook(self._make_layer_hook(layer_idx))
+            self._steer_hooks.append(handle)
+
+    def _remove_steer_hooks(self):
+        for handle in self._steer_hooks:
+            handle.remove()
+        self._steer_hooks = []
             
     def _parse_model_args(self, ma):
         """Standard lm-eval arg parser"""
@@ -110,13 +187,14 @@ class SteerHFLM(HFLM):
     @contextmanager
     def _steering_ctx(self):
         """
-        核心修改：使用 steering_vector.apply() 上下文管理器
+        使用 forward hook 注入，可按生成 token 窗口控制施加范围。
         """
         if self._enabled and self.steering_vector is not None:
-            # apply 会自动处理 hook 注册、device 移动、以及在 forward pass 中注入向量
-            # multiplier 即你的 steer_lambda
-            with self.steering_vector.apply(self.model, multiplier=self.steer_lambda):
+            self._register_steer_hooks()
+            try:
                 yield
+            finally:
+                self._remove_steer_hooks()
         else:
             yield
 
