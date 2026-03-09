@@ -42,7 +42,7 @@ from prm_shared import (
 #     # "hendrycks_math_500_step2fix_wait_recompute"
 # )
 
-RESULTS_ROOT = ("/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/lm-evaluation-harness/runs/09_token_range_exp/all")
+RESULTS_ROOT = ("/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/runs/09_token_range_exp_N256/prefix")
 
 # --- PRM model ---
 PRM_MODEL = "Qwen/Qwen2.5-Math-PRM-7B"
@@ -52,6 +52,9 @@ PRM_DTYPE = "float16"
 NUM_GPUS = 8
 GPU_IDS = list(range(NUM_GPUS))
 
+
+NUM_GPUS = 3
+GPU_IDS = [5, 6, 7]
 # --- Generation model (used for tokenisation stats) ---
 GEN_MODEL = "Qwen/Qwen2.5-3B-Instruct"
 

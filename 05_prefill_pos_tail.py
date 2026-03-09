@@ -43,18 +43,18 @@ def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Prefill early corrected steps and regenerate tail")
     ap.add_argument(
         "--in-file",
-        default="./artifacts/samples_math500_ds2_fix_step2_gpt.json",
+        default="./artifacts/vectors_16_ds2_fix_step2_incorrect_only_id300+_step2_marker/Qwen_Qwen2.5-3B-Instruct_applied/gsm8k_openai_train_step2fix_fix_step2/Qwen2.5-3B-Instruct_L1_BASELINE/samples_gsm8k_train_ds2_fix_step2_CHANGED_ONLY.json",
         help="Input dataset json/jsonl",
     )
     ap.add_argument(
         "--out-file",
-        default="./artifacts/samples_math500_ds2_fix_step2_gpt_prefill.json",
+        default="./artifacts/vectors_16_ds2_fix_step2_incorrect_only_id300+_step2_marker/Qwen_Qwen2.5-3B-Instruct_applied/gsm8k_openai_train_step2fix_fix_step2/Qwen2.5-3B-Instruct_L1_BASELINE/samples_gsm8k_train_ds2_fix_step2_gpt_prefill.json",
         help="Output dataset json/jsonl",
     )
     ap.add_argument("--model-id", default="Qwen/Qwen2.5-3B-Instruct")
     ap.add_argument(
         "--step2-source-file",
-        default="./artifacts/samples_math500_ds2_fix_step2_gpt.json",
+        default="./artifacts/vectors_16_ds2_fix_step2_incorrect_only_id300+_step2_marker/Qwen_Qwen2.5-3B-Instruct_applied/gsm8k_openai_train_step2fix_fix_step2/Qwen2.5-3B-Instruct_L1_BASELINE/samples_gsm8k_train_ds2_fix_step2_CHANGED_ONLY.json",
         help="Dataset file used to fetch corrected Step 2 by doc.id",
     )
     ap.add_argument("--dtype", default="float16", choices=["float16"])

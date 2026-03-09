@@ -36,6 +36,7 @@ class Job:
     model_id: str
     layer: int
     lam: float
+    prefix_n: int
 
 
 def parse_csv_ints(text: str) -> List[int]:
@@ -107,8 +108,10 @@ def worker_loop(
         mode_tag = "prefix" if job.mode == "prefix" else "all"
         lam_tag = lam_to_tag(job.lam)
 
+        effective_max_token = job.prefix_n if job.mode == "prefix" else args.steer_max_token
+
         out_dir = (
-            Path(args.output_root)
+            Path(f"{args.output_root}_N{effective_max_token}") 
             / f"{mode_tag}"
             / f"{job.model_id.split('/')[-1]}_L{job.layer}_{lam_tag}"
         )
@@ -122,7 +125,7 @@ def worker_loop(
             f"steer_vec_path={args.vector_path},"
             f"steer_apply_mode={job.mode},"
             f"steer_min_token={args.steer_min_token},"
-            f"steer_max_token={args.steer_max_token}"
+            f"steer_max_token={effective_max_token}"
         )
 
         cmd = [
@@ -160,7 +163,10 @@ def worker_loop(
         run_log = out_dir / "run.log"
 
         t0 = time.time()
-        print(f"\n[GPU {gpu_id}] mode={job.mode}, layer={job.layer}, lambda={job.lam}")
+        print(
+            f"\n[GPU {gpu_id}] mode={job.mode}, layer={job.layer}, "
+            f"lambda={job.lam}, prefix_n={effective_max_token}"
+        )
         print(f"[GPU {gpu_id}] log -> {run_log}")
 
         record = {
@@ -168,6 +174,7 @@ def worker_loop(
             "model_id": job.model_id,
             "layer": job.layer,
             "lambda": job.lam,
+            "prefix_n": effective_max_token,
             "is_baseline": bool(abs(job.lam) < 1e-9),
             "gpu": gpu_id,
             "status": "running",
@@ -215,9 +222,14 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Steering range experiment: prefix vs all")
     ap.add_argument("--harness-dir", default="./lm-evaluation-harness")
     ap.add_argument("--output-root", default="./runs/09_token_range_exp")
-    ap.add_argument("--vector-path", required=True)
+    ap.add_argument("--vector-path", default="./artifacts/vectors_first2steps/Qwen_Qwen2.5-3B-Instruct_first2steps/steering_vector.pt")
 
     ap.add_argument("--models", default="Qwen/Qwen2.5-3B-Instruct")
+    ap.add_argument(
+        "--modes",
+        default="prefix,all",
+        help="Comma-separated modes to run: prefix, all, or both.",
+    )
     ap.add_argument("--layers", default="6,16,17")
     ap.add_argument("--lambdas", default=DEFAULT_LAMBDAS_CSV)
 
@@ -230,6 +242,11 @@ def main() -> None:
 
     ap.add_argument("--steer-min-token", type=int, default=0)
     ap.add_argument("--steer-max-token", type=int, default=128)
+    ap.add_argument(
+        "--prefix-token-ns",
+        default="128",
+        help="Comma-separated prefix token N list for prefix mode, e.g. 32,64,128. If omitted, uses --steer-max-token.",
+    )
     ap.add_argument("--apply-chat-template", action="store_true", default=True)
     ap.add_argument("--no-apply-chat-template", dest="apply_chat_template", action="store_false")
 
@@ -250,14 +267,34 @@ def main() -> None:
     args.vector_path = str(vector_path)
 
     model_list = [m.strip() for m in args.models.split(",") if m.strip()]
+    modes = [m.strip() for m in args.modes.split(",") if m.strip()]
+    valid_modes = {"prefix", "all"}
+    if not modes:
+        raise ValueError("--modes is empty. Use prefix, all, or prefix,all")
+    invalid_modes = [m for m in modes if m not in valid_modes]
+    if invalid_modes:
+        raise ValueError(f"Invalid --modes: {invalid_modes}. Allowed: prefix,all")
+
     layers = parse_csv_ints(args.layers)
     lambdas = parse_csv_floats(args.lambdas)
     gpus = parse_csv_ints(args.gpus)
+    prefix_token_ns = parse_csv_ints(args.prefix_token_ns) if args.prefix_token_ns else [args.steer_max_token]
 
     jobs = []
-    modes = ["prefix", "all"]
     for mode, model_id, layer, lam in itertools.product(modes, model_list, layers, lambdas):
-        jobs.append(Job(mode=mode, model_id=model_id, layer=layer, lam=lam))
+        if mode == "prefix":
+            for prefix_n in prefix_token_ns:
+                jobs.append(Job(mode=mode, model_id=model_id, layer=layer, lam=lam, prefix_n=prefix_n))
+        else:
+            jobs.append(
+                Job(
+                    mode=mode,
+                    model_id=model_id,
+                    layer=layer,
+                    lam=lam,
+                    prefix_n=args.steer_max_token,
+                )
+            )
 
     jobs_q: queue.Queue = queue.Queue()
     for j in jobs:
@@ -272,6 +309,7 @@ def main() -> None:
         "tasks": args.tasks,
         "num_jobs": len(jobs),
         "prefix_window": [args.steer_min_token, args.steer_max_token],
+        "prefix_token_ns": prefix_token_ns,
         "gpus": gpus,
     }
     (output_root / "plan.json").write_text(json.dumps(plan, indent=2, ensure_ascii=False), encoding="utf-8")

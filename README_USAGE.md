@@ -82,6 +82,10 @@ python 01_construct_datasets_by_GPT.py \
 python 01_construct_datasets_by_GPT.py --force-rewrite --limit 0
 ```
 
+```
+python 01_construct_gsm8k_step2_by_GPT.py --in-file ./artifacts/vectors_16_ds2_fix_step2_incorrect_only_id300+_step2_marker/Qwen_Qwen2.5-3B-Instruct_applied/gsm8k_openai_train_step2fix_fix_step2/Qwen2.5-3B-Instruct_L1_BASELINE/samples_gsm8k_openai_train_incorrect_recomputed.jsonl --out-file ./artifacts/vectors_16_ds2_fix_step2_incorrect_only_id300+_step2_marker/Qwen_Qwen2.5-3B-Instruct_applied/gsm8k_openai_train_step2fix_fix_step2/Qwen2.5-3B-Instruct_L1_BASELINE/samples_gsm8k_openai_train_corrected_second.jsonl  --model gpt-5.1 --judge-first --limit 2
+```
+
 ### 常用参数
 
 - `--judge-first`：先判断 step2 对错，再决定是否改写
