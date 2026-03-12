@@ -252,7 +252,7 @@ def main() -> None:
     if args.batch_size != 1:
         print("[WARN] batch_size is currently ignored; generation runs one sample at a time.")
 
-    repo_root = Path(__file__).resolve().parent
+    repo_root = Path(__file__).resolve().parent.parent.parent
     out_dir = (repo_root / args.out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 

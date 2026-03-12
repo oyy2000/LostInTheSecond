@@ -9,12 +9,15 @@ Usage:
 Modelled after fact-enhancement/06_multi_card_PRM_sml.py + 00_PRM_boards.py
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import argparse
 import glob
 import json
 import multiprocessing as mp
 import os
-from pathlib import Path
 from typing import Dict, List, Optional
 
 import numpy as np

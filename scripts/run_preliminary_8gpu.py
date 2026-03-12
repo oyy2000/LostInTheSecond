@@ -245,7 +245,7 @@ def main():
 
     args = parser.parse_args()
 
-    root = Path(__file__).resolve().parent
+    root = Path(__file__).resolve().parent.parent
     harness_dir = (root / args.harness_dir).resolve()
     output_root = (root / args.output_root).resolve()
     vectors_dir = (root / args.vectors_dir).resolve()

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import argparse
 import json
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Dict, List
 
 from tqdm.auto import tqdm

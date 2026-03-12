@@ -1,7 +1,10 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import json
-from pathlib import Path
 from utils import qwen_chat_prompt
 import os
 import re

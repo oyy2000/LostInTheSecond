@@ -10,9 +10,12 @@ Input dataset format (JSON or JSONL) is compatible with existing DS2 files:
 - optional pos_steps / neg_steps
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import argparse
 import json
-from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import torch

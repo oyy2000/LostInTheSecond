@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Compare base vs LoRA on the same eval task")
     ap.add_argument("--model-id", default="Qwen/Qwen2.5-3B-Instruct")
     ap.add_argument("--lora-path", default="./artifacts/lora_qwen25_3b_ds2_fix_step2/final_adapter")
-    ap.add_argument("--task", default="hendrycks_math_500")
+    ap.add_argument("--task", default="gsm8k_cot_zeroshot_unified")
     ap.add_argument("--harness-dir", default="./lm-evaluation-harness")
     ap.add_argument("--output-root", default="./runs/lora_eval_compare")
     ap.add_argument("--batch-size", default="16")
@@ -113,7 +113,7 @@ def build_lm_eval_command(
 def main() -> None:
     args = parse_args()
 
-    root = Path(__file__).resolve().parent
+    root = Path(__file__).resolve().parent.parent.parent
     harness_dir = (root / args.harness_dir).resolve()
     output_root = (root / args.output_root).resolve()
     lora_path = (root / args.lora_path).resolve()

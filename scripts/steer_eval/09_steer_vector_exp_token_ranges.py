@@ -253,7 +253,7 @@ def main() -> None:
     ap.add_argument("--gpus", default="0,1,2,3,4,5,6,7")
     args = ap.parse_args(argv)
 
-    root = Path(__file__).resolve().parent
+    root = Path(__file__).resolve().parent.parent.parent
     harness_dir = (root / args.harness_dir).resolve()
     output_root = (root / args.output_root).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
