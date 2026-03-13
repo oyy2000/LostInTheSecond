@@ -1,23 +1,18 @@
 #!/usr/bin/env python3
 """
-Full-parameter fine-tuning sweep + GSM8K evaluation.
+Full FT Phase 2 sweep + GSM8K evaluation (vLLM).
 
-Experiment design rationale (top-AI-PhD level):
-  With only 109 training samples on a 3B model, overfitting is the dominant
-  failure mode. LoRA sweep showed lower capacity → better generalization
-  (best: attn_only r=16, and r=4 alpha=4). Full FT goes the opposite
-  direction (3B trainable params), so we MUST use:
-    - Ultra-low learning rates (1e-6 to 5e-5, vs 1e-4 for LoRA)
-    - Strong weight decay (0.01–0.1)
-    - Few epochs (1–5)
-    - Large warmup ratio for stability
-
-  16 experiments across 4 axes: LR, epochs, weight decay, combined.
+Phase 1 found LR=1e-6 with epoch=3 as the most promising regime.
+Phase 2 explores weight decay and warmup at this fixed LR/epoch:
+  - Group A: WD sweep   (warmup=0.1 fixed)
+  - Group B: Warmup sweep (wd=0.01 fixed)
+  - Group C: Cross of promising WD x warmup
 
 Usage:
-    python 14_full_ft_sweep_and_eval.py --gpus 0,1,2,3
-    python 14_full_ft_sweep_and_eval.py --phase eval-only --gpus 0,1,2,3
-    python 14_full_ft_sweep_and_eval.py --phase summary-only
+    python 19_full_ft_sweep_v2.py --gpus 0,1,2,3
+    python 19_full_ft_sweep_v2.py --phase eval-only --gpus 0,1,2,3
+    python 19_full_ft_sweep_v2.py --phase train-only --gpus 0,1,2,3
+    python 19_full_ft_sweep_v2.py --phase summary-only
 """
 
 import argparse
@@ -53,47 +48,45 @@ VLLM_COMMON_ARGS = (
 
 
 # ============================================================
-# Experiment definitions
+# Phase 2 experiment definitions
 # ============================================================
 
-def build_experiments() -> List[Dict[str, Any]]:
+def build_phase2_experiments() -> List[Dict[str, Any]]:
+    """
+    Phase 1 found:
+      - LR=1e-6, ep=3, wd=0.01, warmup=0.1 → EM=0.8446 (#2 overall)
+      - LR=5e-6, ep=3, wd=0.01, warmup=0.1 → EM=0.8461 (#1 overall)
+      - WD and warmup were underexplored at the ultra-low LR regime.
+
+    Phase 2 fixes lr=1e-6, epochs=3, and sweeps WD and warmup.
+    ft_lr1e6 (wd=0.01, warmup=0.1) already exists — skipped below.
+    """
     exps: List[Dict[str, Any]] = []
 
-    def add(name: str, desc: str = "", lr: float = 1e-5, epochs: float = 3,
+    def add(name: str, desc: str = "", lr: float = 1e-6, epochs: float = 3,
             wd: float = 0.01, warmup: float = 0.1, ga_steps: int = 16):
         exps.append(dict(
             name=name, desc=desc, lr=lr, epochs=epochs, wd=wd,
             warmup=warmup, ga_steps=ga_steps,
         ))
 
-    # --- Group A: Learning rate sweep (most critical axis) ---
-    add("ft_lr1e6",  desc="LR sweep: 1e-6 (ultra-conservative)", lr=1e-6)
-    add("ft_lr5e6",  desc="LR sweep: 5e-6", lr=5e-6)
-    add("ft_lr1e5",  desc="LR sweep: 1e-5 (baseline config)", lr=1e-5)
-    add("ft_lr2e5",  desc="LR sweep: 2e-5", lr=2e-5)
-    add("ft_lr5e5",  desc="LR sweep: 5e-5 (aggressive)", lr=5e-5)
+    # --- Group A: WD sweep (warmup=0.1 fixed, lr=1e-6, ep=3) ---
+    add("ft2_wd0",    desc="WD=0.0 at lr=1e-6",   wd=0.0)
+    add("ft2_wd0005", desc="WD=0.005 at lr=1e-6",  wd=0.005)
+    add("ft2_wd005",  desc="WD=0.05 at lr=1e-6",   wd=0.05)
+    add("ft2_wd01",   desc="WD=0.1 at lr=1e-6",    wd=0.1)
 
-    # --- Group B: Epoch sweep (overfitting trajectory) ---
-    add("ft_ep1", desc="Epoch sweep: 1 epoch (minimal training)", epochs=1)
-    add("ft_ep2", desc="Epoch sweep: 2 epochs", epochs=2)
-    add("ft_ep5", desc="Epoch sweep: 5 epochs (risk of overfitting)", epochs=5)
+    # --- Group B: Warmup sweep (wd=0.01 fixed, lr=1e-6, ep=3) ---
+    add("ft2_wu0",   desc="Warmup=0.0 at lr=1e-6",  warmup=0.0)
+    add("ft2_wu005", desc="Warmup=0.05 at lr=1e-6",  warmup=0.05)
+    add("ft2_wu02",  desc="Warmup=0.2 at lr=1e-6",   warmup=0.2)
+    add("ft2_wu03",  desc="Warmup=0.3 at lr=1e-6",   warmup=0.3)
 
-    # --- Group C: Weight decay sweep (regularization) ---
-    add("ft_wd0",    desc="WD sweep: 0.0 (no regularization)", wd=0.0)
-    add("ft_wd005",  desc="WD sweep: 0.05", wd=0.05)
-    add("ft_wd01",   desc="WD sweep: 0.1 (strong regularization)", wd=0.1)
-
-    # --- Group D: Combined best + variations ---
-    add("ft_combo_a", desc="High LR + short training (aggressive-short)",
-        lr=2e-5,  epochs=2, wd=0.01)
-    add("ft_combo_b", desc="Low LR + long training + high WD (conservative-long)",
-        lr=5e-6,  epochs=5, wd=0.05)
-    add("ft_combo_c", desc="No warmup (warmup=0)",
-        lr=1e-5,  epochs=3, warmup=0.0)
-    add("ft_combo_d", desc="High warmup (warmup=0.2)",
-        lr=1e-5,  epochs=3, warmup=0.2)
-    add("ft_combo_e", desc="Short training + moderate WD (balanced)",
-        lr=1e-5,  epochs=2, wd=0.05)
+    # --- Group C: Cross of promising WD x warmup ---
+    add("ft2_wd0_wu02",  desc="WD=0 + warmup=0.2",
+        wd=0.0, warmup=0.2)
+    add("ft2_wd01_wu02", desc="WD=0.1 + warmup=0.2",
+        wd=0.1, warmup=0.2)
 
     return exps
 
@@ -156,7 +149,7 @@ def run_training_sweep(experiments: List[Dict], gpus: List[int]):
     if skipped:
         print(f"Skipping {len(skipped)} already-trained: {skipped}")
     if not to_run:
-        print("All experiments already completed!")
+        print("All Phase 2 experiments already completed!")
         return
 
     n_gpus = len(gpus)
@@ -190,7 +183,7 @@ def run_training_sweep(experiments: List[Dict], gpus: List[int]):
             status = "OK" if proc.returncode == 0 else f"FAILED (rc={proc.returncode})"
             print(f"  {name}: {status}")
 
-    print(f"\nAll training completed.")
+    print(f"\nAll Phase 2 full FT training completed.")
 
 
 # ============================================================
@@ -268,9 +261,6 @@ def load_training_metrics(exp_dir: Path) -> Dict[str, Any]:
         "epochs": cfg.get("num_train_epochs"),
         "wd": cfg.get("weight_decay"),
         "warmup": cfg.get("warmup_ratio"),
-        "optim": cfg.get("optim"),
-        "trainable_params": cfg.get("trainable_params"),
-        "train_samples": cfg.get("train_samples"),
     }
 
 
@@ -283,9 +273,11 @@ def discover_all_models() -> List[Dict[str, Any]]:
         if not model_path.exists() or not (model_path / "config.json").exists():
             continue
         training = load_training_metrics(d)
+        phase = "v2" if d.name.startswith("ft2_") else "v1"
         models.append({
             "name": d.name,
             "model_path": str(model_path),
+            "phase": phase,
             **training,
         })
     return models
@@ -306,25 +298,25 @@ def run_parallel_eval(models: List[Dict], gpus: List[int],
             if entry.get("gsm8k_em") is not None:
                 done[entry["name"]] = entry
 
-    # --- Base model ---
     if "base" not in done:
         print(f"\n[BASE] Evaluating base model on GPU {gpus[0]} ...")
         t0 = time.time()
         model_args = f"pretrained={MODEL_ID},{VLLM_COMMON_ARGS}"
-        proc = run_vllm_eval(model_args, EVAL_ROOT / "base", gpus[0], batch_size, limit)
+        proc = run_vllm_eval(model_args, EVAL_ROOT / "base",
+                             gpus[0], batch_size, limit)
         proc.wait()
         proc._log_fh.close()  # type: ignore[attr-defined]
         elapsed = time.time() - t0
 
         rj = find_latest_results(EVAL_ROOT / "base")
         em = extract_exact_match(rj) if rj else None
-        done["base"] = {"name": "base", "gsm8k_em": em, "elapsed_sec": round(elapsed, 1)}
+        done["base"] = {"name": "base", "gsm8k_em": em,
+                        "elapsed_sec": round(elapsed, 1)}
         save_incremental(incremental_file, done)
         print(f"  Base exact_match = {em}  ({elapsed:.0f}s)")
     else:
         print(f"[BASE] Already done: exact_match = {done['base'].get('gsm8k_em')}")
 
-    # --- Full FT models in parallel ---
     to_eval = [m for m in models if m["name"] not in done]
     print(f"\nModels to evaluate: {len(to_eval)} "
           f"(skipping {len(models) - len(to_eval)} already done)")
@@ -368,9 +360,9 @@ def run_parallel_eval(models: List[Dict], gpus: List[int],
             print(f"  {name}: {status}  ({elapsed:.0f}s)")
 
             done[name] = {
-                "name": name,
-                "gsm8k_em": em,
+                "name": name, "gsm8k_em": em,
                 "elapsed_sec": round(elapsed, 1),
+                "phase": model_info.get("phase"),
                 "method": "full_ft",
                 "eval_loss": model_info.get("eval_loss"),
                 "best_eval_loss": model_info.get("best_eval_loss"),
@@ -379,7 +371,6 @@ def run_parallel_eval(models: List[Dict], gpus: List[int],
                 "epochs": model_info.get("epochs"),
                 "wd": model_info.get("wd"),
                 "warmup": model_info.get("warmup"),
-                "train_samples": model_info.get("train_samples"),
             }
 
         save_incremental(incremental_file, done)
@@ -390,26 +381,12 @@ def run_parallel_eval(models: List[Dict], gpus: List[int],
 
 
 # ============================================================
-# Report generation
+# Report
 # ============================================================
 
 def generate_report(results: Dict[str, Dict], output_path: Path,
-                    experiments: Optional[List[Dict[str, Any]]] = None):
+                    experiments: Optional[List[Dict]] = None):
     base_em = results.get("base", {}).get("gsm8k_em")
-    exp_desc = {e["name"]: e.get("desc", "") for e in (experiments or [])}
-
-    # Also load LoRA best for comparison
-    lora_eval_file = BEEGFS_ARTIFACTS / "lora_sweep" / "_gsm8k_vllm_eval" / "all_results.json"
-    lora_best_em = None
-    lora_best_name = None
-    if lora_eval_file.exists():
-        lora_results = json.loads(lora_eval_file.read_text())
-        lora_adapters = [r for r in lora_results if r.get("name") != "base" and r.get("gsm8k_em")]
-        if lora_adapters:
-            best_lora = max(lora_adapters, key=lambda x: x["gsm8k_em"])
-            lora_best_em = best_lora["gsm8k_em"]
-            lora_best_name = best_lora["name"]
-
     ft_results = sorted(
         [(n, r) for n, r in results.items() if n != "base"],
         key=lambda x: -(x[1].get("gsm8k_em") or -1)
@@ -417,32 +394,25 @@ def generate_report(results: Dict[str, Dict], output_path: Path,
     ok = [(n, r) for n, r in ft_results if r.get("gsm8k_em") is not None]
 
     lines = [
-        "# Full Fine-Tuning Sweep — GSM8K Evaluation Results",
+        "# Full Fine-Tuning Sweep — Phase 1+2 GSM8K Results",
         "",
         f"**Base Model**: `{MODEL_ID}`",
-        f"**Method**: Full parameter fine-tuning (no LoRA)",
-        f"**Optimizer**: paged_adamw_8bit (bitsandbytes)",
+        "**Method**: Full parameter fine-tuning (no LoRA)",
+        "**Optimizer**: paged_adamw_8bit (bitsandbytes)",
         f"**Task**: `{TASK}` (GSM8K zero-shot CoT, 1319 test samples)",
-        f"**Training Data**: 109 train / 6 eval samples",
-        f"**Evaluation Backend**: vLLM (bf16, greedy decoding, max_gen_toks=2048)",
+        "**Training Data**: ~109 train / ~6 eval samples",
+        "**Evaluation Backend**: vLLM (bf16, greedy decoding, max_gen_toks=2048)",
         f"**Date**: {time.strftime('%Y-%m-%d %H:%M')}",
         "",
-        f"## Base Model: GSM8K EM = **{base_em:.4f}**" if base_em else "## Base Model: N/A",
-    ]
-
-    if lora_best_em and lora_best_name:
-        lines.append(f"## Best LoRA (comparison): `{lora_best_name}` EM = **{lora_best_em:.4f}**")
-    lines.append("")
-
-    # Main results table
-    lines.extend([
-        "## Full Results (Ranked by GSM8K Exact Match)",
+        f"## Base Model: GSM8K EM = **{base_em:.4f}**" if base_em
+        else "## Base Model: N/A",
         "",
-        "| Rank | Name | GSM8K EM | Delta | Eval Loss | Best EL | Train Loss "
-        "| LR | Epochs | WD | Warmup |",
-        "|------|------|----------|-------|-----------|---------|------------"
-        "|-----|--------|-----|--------|",
-    ])
+        "## Full Results (Ranked by GSM8K Exact Match)", "",
+        "| Rank | Name | Phase | GSM8K EM | Delta | Eval Loss | Best EL "
+        "| Train Loss | LR | Epochs | WD | Warmup |",
+        "|------|------|-------|----------|-------|-----------|--------"
+        "|------------|-----|--------|-----|--------|",
+    ]
 
     for i, (name, r) in enumerate(ft_results):
         em = r.get("gsm8k_em")
@@ -454,112 +424,30 @@ def generate_report(results: Dict[str, Dict], output_path: Path,
         tl = f"{r.get('train_loss'):.4f}" if r.get('train_loss') is not None else "—"
         lr_val = r.get("lr")
         lr_str = f"{lr_val:.0e}" if lr_val is not None else "—"
+        phase = r.get("phase", "—")
         lines.append(
-            f"| {i+1} | {name} | {em_str} | {delta_str} | {el} | {bel} | {tl} "
-            f"| {lr_str} | {r.get('epochs', '—')} | {r.get('wd', '—')} "
-            f"| {r.get('warmup', '—')} |"
+            f"| {i+1} | {name} | {phase} | {em_str} | {delta_str} | "
+            f"{el} | {bel} | {tl} | {lr_str} | "
+            f"{r.get('epochs', '—')} | {r.get('wd', '—')} | "
+            f"{r.get('warmup', '—')} |"
         )
 
-    # Experiment descriptions
-    if exp_desc:
-        lines.extend(["", "## Experiment Descriptions", "",
-                       "| Name | Description | LR | Epochs | WD | Warmup |",
-                       "|------|-------------|-----|--------|-----|--------|"])
-        for name, r in ft_results:
-            desc = exp_desc.get(name, "")
-            lr_val = r.get("lr")
-            lr_str = f"{lr_val:.0e}" if lr_val is not None else "—"
-            lines.append(
-                f"| {name} | {desc} | {lr_str} | {r.get('epochs', '—')} "
-                f"| {r.get('wd', '—')} | {r.get('warmup', '—')} |")
-
-    # Key findings
     if ok and base_em is not None:
         best_name, best_r = ok[0]
         worst_name, worst_r = ok[-1]
         improved = [x for x in ok if x[1]["gsm8k_em"] > base_em]
-
-        lines.extend(["", "## Key Findings", ""])
-        lines.append(f"- **Best full FT**: `{best_name}` "
-                     f"(EM = {best_r['gsm8k_em']:.4f}, "
-                     f"delta = {best_r['gsm8k_em'] - base_em:+.4f})")
-        lines.append(f"- **Worst full FT**: `{worst_name}` "
-                     f"(EM = {worst_r['gsm8k_em']:.4f}, "
-                     f"delta = {worst_r['gsm8k_em'] - base_em:+.4f})")
-        lines.append(f"- **{len(improved)}/{len(ok)}** experiments improved over base")
-
-        if lora_best_em:
-            if best_r['gsm8k_em'] > lora_best_em:
-                lines.append(f"- Full FT **beats** best LoRA by "
-                             f"{best_r['gsm8k_em'] - lora_best_em:+.4f}")
-            else:
-                lines.append(f"- Full FT **loses** to best LoRA by "
-                             f"{best_r['gsm8k_em'] - lora_best_em:+.4f}")
-
-    # HP analysis
-    lines.extend(["", "## Hyperparameter Analysis", ""])
-
-    # LR
-    lr_groups: Dict[str, List[float]] = {}
-    for n, r in ok:
-        lr_val = r.get("lr")
-        if lr_val is not None:
-            key = f"{lr_val:.0e}"
-            lr_groups.setdefault(key, []).append(r["gsm8k_em"])
-    if lr_groups:
-        lines.extend(["### Learning Rate", "",
-                       "| LR | Count | Mean EM | Best EM | Worst EM |",
-                       "|----|-------|---------|---------|----------|"])
-        for lr_key in sorted(lr_groups.keys(), key=lambda x: float(x)):
-            vals = lr_groups[lr_key]
-            lines.append(f"| {lr_key} | {len(vals)} | {sum(vals)/len(vals):.4f} "
-                         f"| {max(vals):.4f} | {min(vals):.4f} |")
-
-    # Epochs
-    ep_groups: Dict[float, List[float]] = {}
-    for n, r in ok:
-        ep = r.get("epochs")
-        if ep is not None:
-            ep_groups.setdefault(float(ep), []).append(r["gsm8k_em"])
-    if ep_groups:
-        lines.extend(["", "### Epochs", "",
-                       "| Epochs | Count | Mean EM | Best EM |",
-                       "|--------|-------|---------|---------|"])
-        for ep in sorted(ep_groups.keys()):
-            vals = ep_groups[ep]
-            lines.append(f"| {ep:.0f} | {len(vals)} | {sum(vals)/len(vals):.4f} "
-                         f"| {max(vals):.4f} |")
-
-    # WD
-    wd_groups: Dict[float, List[float]] = {}
-    for n, r in ok:
-        wd = r.get("wd")
-        if wd is not None:
-            wd_groups.setdefault(float(wd), []).append(r["gsm8k_em"])
-    if wd_groups:
-        lines.extend(["", "### Weight Decay", "",
-                       "| WD | Count | Mean EM | Best EM |",
-                       "|----|-------|---------|---------|"])
-        for wd in sorted(wd_groups.keys()):
-            vals = wd_groups[wd]
-            lines.append(f"| {wd} | {len(vals)} | {sum(vals)/len(vals):.4f} "
-                         f"| {max(vals):.4f} |")
-
-    # Overfitting analysis
-    lines.extend(["", "## Overfitting Analysis", "",
-                   "| Name | Train Loss | Eval Loss | Gap | GSM8K EM |",
-                   "|------|-----------|-----------|-----|----------|"])
-    for n, r in ft_results:
-        tl = r.get("train_loss")
-        el = r.get("eval_loss")
-        em = r.get("gsm8k_em")
-        if tl is not None and el is not None and em is not None:
-            gap = el - tl
-            lines.append(f"| {n} | {tl:.4f} | {el:.4f} | {gap:+.4f} | {em:.4f} |")
+        lines.extend(["", "## Key Findings", "",
+            f"- **Best full FT**: `{best_name}` "
+            f"(EM = {best_r['gsm8k_em']:.4f}, "
+            f"delta = {best_r['gsm8k_em'] - base_em:+.4f})",
+            f"- **Worst full FT**: `{worst_name}` "
+            f"(EM = {worst_r['gsm8k_em']:.4f}, "
+            f"delta = {worst_r['gsm8k_em'] - base_em:+.4f})",
+            f"- **{len(improved)}/{len(ok)}** experiments improved over base",
+        ])
 
     lines.extend(["", "---", "",
-                   f"*Generated: {time.strftime('%Y-%m-%d %H:%M')}*",
-                   f"*Full JSON: `{EVAL_ROOT / 'all_results.json'}`*", ""])
+                   f"*Generated: {time.strftime('%Y-%m-%d %H:%M')}*", ""])
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines), encoding="utf-8")
@@ -574,12 +462,11 @@ def print_summary(results: Dict[str, Dict]):
     )
 
     print(f"\n{'=' * 100}")
-    print(f"{'FULL FT — GSM8K EVALUATION RESULTS':^100}")
+    print(f"{'FULL FT Phase 1+2 — GSM8K RESULTS (vLLM)':^100}")
     print(f"{'=' * 100}")
     print(f"\nBase model: {MODEL_ID}  |  GSM8K EM = {base_em}")
-    print(f"\n{'Rk':<4} {'Name':<20} {'GSM8K EM':<10} {'Delta':<8} "
-          f"{'EvalLoss':<10} {'TrainLoss':<10} {'LR':<8} {'Ep':<5} "
-          f"{'WD':<6} {'WU':<6}")
+    print(f"\n{'Rk':<4} {'Name':<20} {'Ph':<4} {'GSM8K EM':<10} {'Delta':<8} "
+          f"{'EvalLoss':<10} {'LR':<8} {'Ep':<5} {'WD':<6} {'WU':<6}")
     print("-" * 100)
 
     for i, (name, r) in enumerate(ft_results):
@@ -587,13 +474,12 @@ def print_summary(results: Dict[str, Dict]):
         em_str = f"{em:.4f}" if em is not None else "FAIL"
         delta_str = f"{em - base_em:+.4f}" if (em and base_em) else "N/A"
         el = f"{r.get('eval_loss', 0):.4f}" if r.get('eval_loss') is not None else "—"
-        tl = f"{r.get('train_loss', 0):.4f}" if r.get('train_loss') is not None else "—"
         lr_val = r.get("lr")
         lr_str = f"{lr_val:.0e}" if lr_val is not None else "—"
-        print(f"{i+1:<4} {name:<20} {em_str:<10} {delta_str:<8} "
-              f"{el:<10} {tl:<10} {lr_str:<8} "
-              f"{str(r.get('epochs', '—')):<5} {str(r.get('wd', '—')):<6} "
-              f"{str(r.get('warmup', '—')):<6}")
+        ph = r.get("phase", "—")
+        print(f"{i+1:<4} {name:<20} {ph:<4} {em_str:<10} {delta_str:<8} "
+              f"{el:<10} {lr_str:<8} {str(r.get('epochs', '—')):<5} "
+              f"{str(r.get('wd', '—')):<6} {str(r.get('warmup', '—')):<6}")
 
     ok = [(n, r) for n, r in ft_results if r.get("gsm8k_em") is not None]
     if ok and base_em:
@@ -620,17 +506,17 @@ def main():
 
     gpus = [int(x) for x in args.gpus.split(",")]
     t_global = time.time()
-    experiments = build_experiments()
 
-    # ---- Training sweep ----
+    # ---- Phase 2 Training ----
     if args.phase in ("all", "train-only"):
+        experiments = build_phase2_experiments()
 
         print(f"\n{'#' * 70}")
-        print(f"  FULL FT TRAINING SWEEP: {len(experiments)} experiments, "
+        print(f"  FULL FT PHASE 2 TRAINING: {len(experiments)} experiments, "
               f"{len(gpus)} GPUs")
         print(f"{'#' * 70}")
 
-        plan_file = SWEEP_ROOT / "experiment_plan.json"
+        plan_file = SWEEP_ROOT / "v2_experiment_plan.json"
         SWEEP_ROOT.mkdir(parents=True, exist_ok=True)
         plan_file.write_text(json.dumps(experiments, indent=2))
         print(f"Plan: {plan_file}")
@@ -638,7 +524,7 @@ def main():
         t0 = time.time()
         run_training_sweep(experiments, gpus)
         elapsed = time.time() - t0
-        print(f"\nTraining completed in {elapsed/60:.1f} min")
+        print(f"\nPhase 2 training completed in {elapsed/60:.1f} min")
 
     # ---- GSM8K Evaluation ----
     if args.phase in ("all", "eval-only"):
@@ -657,8 +543,7 @@ def main():
         print(f"\nEvaluation completed in {elapsed/60:.1f} min")
 
         print_summary(results)
-        generate_report(results, DOCUMENTS_DIR / "full_ft_gsm8k_results.md",
-                        experiments)
+        generate_report(results, DOCUMENTS_DIR / "full_ft_gsm8k_results.md")
 
     # ---- Summary only ----
     if args.phase == "summary-only":
@@ -668,8 +553,7 @@ def main():
             return
         results = {r["name"]: r for r in json.loads(results_file.read_text())}
         print_summary(results)
-        generate_report(results, DOCUMENTS_DIR / "full_ft_gsm8k_results.md",
-                        experiments)
+        generate_report(results, DOCUMENTS_DIR / "full_ft_gsm8k_results.md")
 
     total_elapsed = time.time() - t_global
     print(f"\n{'=' * 70}")
