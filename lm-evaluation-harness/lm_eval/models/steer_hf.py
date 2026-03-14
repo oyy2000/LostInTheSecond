@@ -8,7 +8,7 @@ from typing import Optional
 try:
     from steering_vectors import SteeringVector
 except ImportError:
-    raise ImportError("Please install steering-vectors: pip install steering-vectors")
+    SteeringVector = None
 
 # lm-eval registry
 from lm_eval.api.registry import register_model

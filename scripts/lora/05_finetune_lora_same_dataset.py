@@ -213,10 +213,10 @@ def main():
         torch_dtype=torch_dtype,
         trust_remote_code=True,
         device_map="auto",
+        attn_implementation="sdpa",
     )
 
     if args.gradient_checkpointing:
-        model.gradient_checkpointing_enable()
         model.config.use_cache = False
 
     target_modules = [x.strip() for x in args.target_modules.split(",") if x.strip()]
@@ -245,12 +245,15 @@ def main():
         save_steps=args.save_steps,
         eval_steps=args.eval_steps,
         save_total_limit=args.save_total_limit,
-        eval_strategy="steps",
+        eval_strategy="no",
         save_strategy="steps",
+        load_best_model_at_end=False,
         bf16=args.bf16,
         fp16=args.fp16,
         seed=args.seed,
         report_to=[],
+        gradient_checkpointing=args.gradient_checkpointing,
+        gradient_checkpointing_kwargs={"use_reentrant": False},
     )
 
     trainer = Trainer(
@@ -263,8 +266,13 @@ def main():
 
     train_result = trainer.train()
 
-    eval_result = trainer.evaluate()
-    print(f"Final eval loss: {eval_result.get('eval_loss', 'N/A')}")
+    try:
+        torch.cuda.empty_cache()
+        eval_result = trainer.evaluate()
+        print(f"Final eval loss: {eval_result.get('eval_loss', 'N/A')}")
+    except torch.cuda.OutOfMemoryError:
+        print("Eval OOM — skipping final eval (model already saved)")
+        eval_result = {}
 
     sweep_metrics = {
         "train_metrics": train_result.metrics,

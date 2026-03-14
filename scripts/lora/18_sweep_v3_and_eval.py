@@ -34,20 +34,21 @@ TRAIN_SCRIPT = SCRIPT_DIR / "05_finetune_lora_same_dataset.py"
 HARNESS_DIR = PROJECT_ROOT / "lm-evaluation-harness"
 DOCUMENTS_DIR = PROJECT_ROOT / "documents"
 
-BEEGFS_ARTIFACTS = Path("/mnt/beegfs/youyang7/projects/LostInSecond/artifacts")
-DATASET_PREFILL = BEEGFS_ARTIFACTS / "samples_gsm8k_train_ds2_fix_step2_gpt_prefill.json"
-SWEEP_ROOT = BEEGFS_ARTIFACTS / "lora_sweep"
+ARTIFACTS_LOCAL = PROJECT_ROOT / "artifacts_local"
+DATASET_PREFILL = PROJECT_ROOT / "artifacts_real" / "samples_gsm8k_train_ds2_fix_step2_gpt_prefill.json"
+SWEEP_ROOT = ARTIFACTS_LOCAL / "lora_sweep"
 EVAL_ROOT = SWEEP_ROOT / "_gsm8k_vllm_eval"
 
 MODEL_ID = "Qwen/Qwen2.5-3B-Instruct"
-PYTHON_BIN = "/mnt/beegfs/youyang7/.conda/envs/fact/bin/python"
+PYTHON_BIN = "/common/home/sl2148/anaconda3/envs/sft/bin/python"
 TASK = "gsm8k_cot_zeroshot_unified"
 
 VLLM_COMMON_ARGS = (
-    "dtype=bfloat16,"
+    "dtype=float16,"
     "gpu_memory_utilization=0.9,"
-    "max_model_len=3072,"
-    "max_num_seqs=64"
+    "max_model_len=2048,"
+    "max_num_seqs=16,"
+    "enforce_eager=True"
 )
 
 ALL_MODULES = "q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj"
@@ -308,6 +309,34 @@ def save_incremental(path: Path, results: Dict[str, Dict]):
     path.write_text(json.dumps(list(results.values()), indent=2, default=str))
 
 
+def merge_lora_adapter(adapter_path: str, output_dir: Path) -> Path:
+    """Merge LoRA adapter into base model, return path to merged model."""
+    merged_path = output_dir / "merged_model"
+    if merged_path.exists() and (merged_path / "config.json").exists():
+        return merged_path
+    merged_path.mkdir(parents=True, exist_ok=True)
+    merge_script = (
+        f"import torch; "
+        f"from peft import PeftModel; "
+        f"from transformers import AutoModelForCausalLM, AutoTokenizer; "
+        f"base = AutoModelForCausalLM.from_pretrained('{MODEL_ID}', torch_dtype=torch.float16); "
+        f"model = PeftModel.from_pretrained(base, '{adapter_path}'); "
+        f"merged = model.merge_and_unload(); "
+        f"merged.save_pretrained('{merged_path}'); "
+        f"AutoTokenizer.from_pretrained('{MODEL_ID}').save_pretrained('{merged_path}'); "
+        f"print('Merged to', '{merged_path}')"
+    )
+    proc = subprocess.run(
+        [PYTHON_BIN, "-c", merge_script],
+        capture_output=True, text=True,
+        env={**os.environ, "CUDA_VISIBLE_DEVICES": ""}
+    )
+    if proc.returncode != 0:
+        print(f"  Merge FAILED: {proc.stderr[-500:]}")
+        return Path("")
+    return merged_path
+
+
 def run_parallel_eval(adapters: List[Dict], gpus: List[int],
                       batch_size: str, limit: int) -> Dict[str, Dict]:
     EVAL_ROOT.mkdir(parents=True, exist_ok=True)
@@ -346,64 +375,62 @@ def run_parallel_eval(adapters: List[Dict], gpus: List[int],
         print("All evaluations already completed!")
         return done
 
-    n_gpus = len(gpus)
-    total_batches = (len(to_eval) + n_gpus - 1) // n_gpus
+    # Merge LoRA adapters into base model (CPU only, sequential)
+    print(f"\nMerging {len(to_eval)} LoRA adapters into base model ...")
+    for adapter in to_eval:
+        name = adapter["name"]
+        merged = merge_lora_adapter(
+            adapter["adapter_path"], SWEEP_ROOT / name)
+        adapter["merged_path"] = str(merged)
+        if merged.exists():
+            print(f"  {name}: merged OK")
+        else:
+            print(f"  {name}: merge FAILED")
 
-    for batch_idx in range(total_batches):
-        batch_start = batch_idx * n_gpus
-        batch = to_eval[batch_start: batch_start + n_gpus]
+    gpu = gpus[0]
+    for idx, adapter in enumerate(to_eval):
+        name = adapter["name"]
+        merged_path = adapter.get("merged_path", "")
+        if not merged_path or not Path(merged_path).exists():
+            print(f"  Skipping {name} (no merged model)")
+            continue
 
         print(f"\n{'=' * 70}")
-        print(f"EVAL BATCH {batch_idx + 1}/{total_batches}  |  "
-              f"{[a['name'] for a in batch]}")
+        print(f"EVAL {idx + 1}/{len(to_eval)}  |  {name}  |  GPU {gpu}")
         print(f"{'=' * 70}")
 
-        procs = []
-        for i, adapter in enumerate(batch):
-            gpu = gpus[i % n_gpus]
-            name = adapter["name"]
-            model_args = (
-                f"pretrained={MODEL_ID},"
-                f"lora_local_path={adapter['adapter_path']},"
-                f"max_lora_rank=64,{VLLM_COMMON_ARGS}"
-            )
-            print(f"  Launching {name} on GPU {gpu} ...")
-            proc = run_vllm_eval(
-                model_args, EVAL_ROOT / name, gpu, batch_size, limit)
-            procs.append((adapter, proc, time.time()))
-            time.sleep(3)
+        model_args = f"pretrained={merged_path},{VLLM_COMMON_ARGS}"
+        t0 = time.time()
+        proc = run_vllm_eval(
+            model_args, EVAL_ROOT / name, gpu, batch_size, limit)
+        proc.wait()
+        proc._log_fh.close()  # type: ignore[attr-defined]
+        elapsed = time.time() - t0
 
-        for adapter, proc, t0 in procs:
-            proc.wait()
-            proc._log_fh.close()  # type: ignore[attr-defined]
-            elapsed = time.time() - t0
-            name = adapter["name"]
+        rj = find_latest_results(EVAL_ROOT / name)
+        em = extract_exact_match(rj) if rj else None
+        status = f"EM = {em:.4f}" if em is not None else "FAILED"
+        print(f"  {name}: {status}  ({elapsed:.0f}s)")
 
-            rj = find_latest_results(EVAL_ROOT / name)
-            em = extract_exact_match(rj) if rj else None
-            status = f"EM = {em:.4f}" if em is not None else "FAILED"
-            print(f"  {name}: {status}  ({elapsed:.0f}s)")
-
-            done[name] = {
-                "name": name, "gsm8k_em": em,
-                "elapsed_sec": round(elapsed, 1),
-                "phase": adapter.get("phase"),
-                "eval_loss": adapter.get("eval_loss"),
-                "best_eval_loss": adapter.get("best_eval_loss"),
-                "train_loss": adapter.get("train_loss"),
-                "lr": adapter.get("lr"),
-                "r": adapter.get("r"),
-                "alpha": adapter.get("alpha"),
-                "dropout": adapter.get("dropout"),
-                "epochs": adapter.get("epochs"),
-                "wd": adapter.get("wd"),
-                "warmup": adapter.get("warmup"),
-                "modules": adapter.get("modules"),
-            }
+        done[name] = {
+            "name": name, "gsm8k_em": em,
+            "elapsed_sec": round(elapsed, 1),
+            "phase": adapter.get("phase"),
+            "eval_loss": adapter.get("eval_loss"),
+            "best_eval_loss": adapter.get("best_eval_loss"),
+            "train_loss": adapter.get("train_loss"),
+            "lr": adapter.get("lr"),
+            "r": adapter.get("r"),
+            "alpha": adapter.get("alpha"),
+            "dropout": adapter.get("dropout"),
+            "epochs": adapter.get("epochs"),
+            "wd": adapter.get("wd"),
+            "warmup": adapter.get("warmup"),
+            "modules": adapter.get("modules"),
+        }
 
         save_incremental(incremental_file, done)
-        remaining = len(to_eval) - (batch_start + len(batch))
-        print(f"  Saved. Remaining: {remaining} adapters")
+        print(f"  Saved. Remaining: {len(to_eval) - idx - 1} adapters")
 
     return done
 

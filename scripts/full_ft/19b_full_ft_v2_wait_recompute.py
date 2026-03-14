@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 """
-Full FT Phase 2 sweep + GSM8K evaluation (vLLM).
+Full FT Phase 2 sweep + GSM8K evaluation (vLLM) — Wait+Recompute dataset.
 
-Phase 1 found LR=1e-6 with epoch=3 as the most promising regime.
-Phase 2 explores weight decay and warmup at this fixed LR/epoch:
-  - Group A: WD sweep   (warmup=0.1 fixed)
-  - Group B: Warmup sweep (wd=0.01 fixed)
-  - Group C: Cross of promising WD x warmup
+Same experiment grid as 19_full_ft_sweep_v2.py but trained on the
+wait+recompute prefill dataset:
+  pos = [step1, old_step2, "Wait, ...", corrected_step2, tail]
 
 Usage:
-    python 19_full_ft_sweep_v2.py --gpus 0,1,2,3
-    python 19_full_ft_sweep_v2.py --phase eval-only --gpus 0,1,2,3
-    python 19_full_ft_sweep_v2.py --phase train-only --gpus 0,1,2,3
-    python 19_full_ft_sweep_v2.py --phase summary-only
+    python 19b_full_ft_v2_wait_recompute.py --gpus 0,1,2,3
+    python 19b_full_ft_v2_wait_recompute.py --phase eval-only --gpus 0,1,2,3
+    python 19b_full_ft_v2_wait_recompute.py --phase train-only --gpus 0,1,2,3
+    python 19b_full_ft_v2_wait_recompute.py --phase summary-only
 """
 
 import argparse
@@ -31,8 +29,8 @@ HARNESS_DIR = PROJECT_ROOT / "lm-evaluation-harness"
 DOCUMENTS_DIR = PROJECT_ROOT / "documents"
 
 ARTIFACTS_LOCAL = PROJECT_ROOT / "artifacts_local"
-DATASET_PREFILL = PROJECT_ROOT / "artifacts_real" / "samples_gsm8k_train_ds2_fix_step2_gpt_prefill.json"
-SWEEP_ROOT = ARTIFACTS_LOCAL / "full_ft_sweep"
+DATASET_PREFILL = PROJECT_ROOT / "artifacts_real" / "samples_gsm8k_train_ds2_wait_recompute_gpt_prefill.json"
+SWEEP_ROOT = ARTIFACTS_LOCAL / "full_ft_sweep_wr"
 EVAL_ROOT = SWEEP_ROOT / "_gsm8k_vllm_eval"
 
 MODEL_ID = "Qwen/Qwen2.5-3B-Instruct"
@@ -48,20 +46,7 @@ VLLM_COMMON_ARGS = (
 )
 
 
-# ============================================================
-# Phase 2 experiment definitions
-# ============================================================
-
 def build_phase2_experiments() -> List[Dict[str, Any]]:
-    """
-    Phase 1 found:
-      - LR=1e-6, ep=3, wd=0.01, warmup=0.1 → EM=0.8446 (#2 overall)
-      - LR=5e-6, ep=3, wd=0.01, warmup=0.1 → EM=0.8461 (#1 overall)
-      - WD and warmup were underexplored at the ultra-low LR regime.
-
-    Phase 2 fixes lr=1e-6, epochs=3, and sweeps WD and warmup.
-    ft_lr1e6 (wd=0.01, warmup=0.1) already exists — skipped below.
-    """
     exps: List[Dict[str, Any]] = []
 
     def add(name: str, desc: str = "", lr: float = 1e-6, epochs: float = 3,
@@ -71,30 +56,21 @@ def build_phase2_experiments() -> List[Dict[str, Any]]:
             warmup=warmup, ga_steps=ga_steps,
         ))
 
-    # --- Group A: WD sweep (warmup=0.1 fixed, lr=1e-6, ep=3) ---
     add("ft2_wd0",    desc="WD=0.0 at lr=1e-6",   wd=0.0)
     add("ft2_wd0005", desc="WD=0.005 at lr=1e-6",  wd=0.005)
     add("ft2_wd005",  desc="WD=0.05 at lr=1e-6",   wd=0.05)
     add("ft2_wd01",   desc="WD=0.1 at lr=1e-6",    wd=0.1)
 
-    # --- Group B: Warmup sweep (wd=0.01 fixed, lr=1e-6, ep=3) ---
     add("ft2_wu0",   desc="Warmup=0.0 at lr=1e-6",  warmup=0.0)
     add("ft2_wu005", desc="Warmup=0.05 at lr=1e-6",  warmup=0.05)
     add("ft2_wu02",  desc="Warmup=0.2 at lr=1e-6",   warmup=0.2)
     add("ft2_wu03",  desc="Warmup=0.3 at lr=1e-6",   warmup=0.3)
 
-    # --- Group C: Cross of promising WD x warmup ---
-    add("ft2_wd0_wu02",  desc="WD=0 + warmup=0.2",
-        wd=0.0, warmup=0.2)
-    add("ft2_wd01_wu02", desc="WD=0.1 + warmup=0.2",
-        wd=0.1, warmup=0.2)
+    add("ft2_wd0_wu02",  desc="WD=0 + warmup=0.2",  wd=0.0, warmup=0.2)
+    add("ft2_wd01_wu02", desc="WD=0.1 + warmup=0.2", wd=0.1, warmup=0.2)
 
     return exps
 
-
-# ============================================================
-# Training
-# ============================================================
 
 def launch_training(exp: Dict, gpu_id: int) -> subprocess.Popen:
     name = exp["name"]
@@ -186,10 +162,6 @@ def run_training_sweep(experiments: List[Dict], gpus: List[int]):
 
     print(f"\nAll Phase 2 full FT training completed.")
 
-
-# ============================================================
-# GSM8K Evaluation (vLLM)
-# ============================================================
 
 def find_latest_results(run_dir: Path) -> Optional[Path]:
     candidates = sorted(run_dir.rglob("results_*.json"))
@@ -326,52 +298,60 @@ def run_parallel_eval(models: List[Dict], gpus: List[int],
         print("All evaluations already completed!")
         return done
 
-    gpu = gpus[0]
+    n_gpus = len(gpus)
+    total_batches = (len(to_eval) + n_gpus - 1) // n_gpus
 
-    for idx, model_info in enumerate(to_eval):
-        name = model_info["name"]
-        model_args = f"pretrained={model_info['model_path']},{VLLM_COMMON_ARGS}"
+    for batch_idx in range(total_batches):
+        batch_start = batch_idx * n_gpus
+        batch = to_eval[batch_start: batch_start + n_gpus]
 
         print(f"\n{'=' * 70}")
-        print(f"EVAL {idx + 1}/{len(to_eval)}  |  {name}  |  GPU {gpu}")
+        print(f"EVAL BATCH {batch_idx + 1}/{total_batches}  |  "
+              f"{[m['name'] for m in batch]}")
         print(f"{'=' * 70}")
 
-        t0 = time.time()
-        proc = run_vllm_eval(
-            model_args, EVAL_ROOT / name, gpu, batch_size, limit)
-        proc.wait()
-        proc._log_fh.close()  # type: ignore[attr-defined]
-        elapsed = time.time() - t0
+        procs = []
+        for i, model_info in enumerate(batch):
+            gpu = gpus[i % n_gpus]
+            name = model_info["name"]
+            model_args = f"pretrained={model_info['model_path']},{VLLM_COMMON_ARGS}"
+            print(f"  Launching {name} on GPU {gpu} ...")
+            proc = run_vllm_eval(
+                model_args, EVAL_ROOT / name, gpu, batch_size, limit)
+            procs.append((model_info, proc, time.time()))
+            time.sleep(3)
 
-        rj = find_latest_results(EVAL_ROOT / name)
-        em = extract_exact_match(rj) if rj else None
-        status = f"EM = {em:.4f}" if em is not None else "FAILED"
-        print(f"  {name}: {status}  ({elapsed:.0f}s)")
+        for model_info, proc, t0 in procs:
+            proc.wait()
+            proc._log_fh.close()  # type: ignore[attr-defined]
+            elapsed = time.time() - t0
+            name = model_info["name"]
 
-        done[name] = {
-            "name": name, "gsm8k_em": em,
-            "elapsed_sec": round(elapsed, 1),
-            "phase": model_info.get("phase"),
-            "method": "full_ft",
-            "eval_loss": model_info.get("eval_loss"),
-            "best_eval_loss": model_info.get("best_eval_loss"),
-            "train_loss": model_info.get("train_loss"),
-            "lr": model_info.get("lr"),
-            "epochs": model_info.get("epochs"),
-            "wd": model_info.get("wd"),
-            "warmup": model_info.get("warmup"),
-        }
+            rj = find_latest_results(EVAL_ROOT / name)
+            em = extract_exact_match(rj) if rj else None
+            status = f"EM = {em:.4f}" if em is not None else "FAILED"
+            print(f"  {name}: {status}  ({elapsed:.0f}s)")
+
+            done[name] = {
+                "name": name, "gsm8k_em": em,
+                "elapsed_sec": round(elapsed, 1),
+                "phase": model_info.get("phase"),
+                "method": "full_ft",
+                "eval_loss": model_info.get("eval_loss"),
+                "best_eval_loss": model_info.get("best_eval_loss"),
+                "train_loss": model_info.get("train_loss"),
+                "lr": model_info.get("lr"),
+                "epochs": model_info.get("epochs"),
+                "wd": model_info.get("wd"),
+                "warmup": model_info.get("warmup"),
+            }
 
         save_incremental(incremental_file, done)
-        remaining = len(to_eval) - (idx + 1)
+        remaining = len(to_eval) - (batch_start + len(batch))
         print(f"  Saved. Remaining: {remaining} models")
 
     return done
 
-
-# ============================================================
-# Report
-# ============================================================
 
 def generate_report(results: Dict[str, Dict], output_path: Path,
                     experiments: Optional[List[Dict]] = None):
@@ -383,13 +363,14 @@ def generate_report(results: Dict[str, Dict], output_path: Path,
     ok = [(n, r) for n, r in ft_results if r.get("gsm8k_em") is not None]
 
     lines = [
-        "# Full Fine-Tuning Sweep — Phase 1+2 GSM8K Results",
+        "# Full Fine-Tuning Sweep — Wait+Recompute Dataset Results",
         "",
         f"**Base Model**: `{MODEL_ID}`",
         "**Method**: Full parameter fine-tuning (no LoRA)",
         "**Optimizer**: paged_adamw_8bit (bitsandbytes)",
         f"**Task**: `{TASK}` (GSM8K zero-shot CoT, 1319 test samples)",
-        "**Training Data**: ~109 train / ~6 eval samples",
+        "**Training Data**: Wait+Recompute prefill dataset "
+        "(pos = step1 + old_step2 + Wait... + corrected_step2 + tail)",
         "**Evaluation Backend**: vLLM (bf16, greedy decoding, max_gen_toks=2048)",
         f"**Date**: {time.strftime('%Y-%m-%d %H:%M')}",
         "",
@@ -451,7 +432,7 @@ def print_summary(results: Dict[str, Dict]):
     )
 
     print(f"\n{'=' * 100}")
-    print(f"{'FULL FT Phase 1+2 — GSM8K RESULTS (vLLM)':^100}")
+    print(f"{'FULL FT — Wait+Recompute GSM8K RESULTS (vLLM)':^100}")
     print(f"{'=' * 100}")
     print(f"\nBase model: {MODEL_ID}  |  GSM8K EM = {base_em}")
     print(f"\n{'Rk':<4} {'Name':<20} {'Ph':<4} {'GSM8K EM':<10} {'Delta':<8} "
@@ -479,10 +460,6 @@ def print_summary(results: Dict[str, Dict]):
               f"delta={best[1]['gsm8k_em'] - base_em:+.4f})")
 
 
-# ============================================================
-# Main
-# ============================================================
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--gpus", default="0,1,2,3")
@@ -496,13 +473,13 @@ def main():
     gpus = [int(x) for x in args.gpus.split(",")]
     t_global = time.time()
 
-    # ---- Phase 2 Training ----
     if args.phase in ("all", "train-only"):
         experiments = build_phase2_experiments()
 
         print(f"\n{'#' * 70}")
-        print(f"  FULL FT PHASE 2 TRAINING: {len(experiments)} experiments, "
-              f"{len(gpus)} GPUs")
+        print(f"  FULL FT PHASE 2 (Wait+Recompute): {len(experiments)} "
+              f"experiments, {len(gpus)} GPUs")
+        print(f"  Dataset: {DATASET_PREFILL}")
         print(f"{'#' * 70}")
 
         plan_file = SWEEP_ROOT / "v2_experiment_plan.json"
@@ -515,7 +492,6 @@ def main():
         elapsed = time.time() - t0
         print(f"\nPhase 2 training completed in {elapsed/60:.1f} min")
 
-    # ---- GSM8K Evaluation ----
     if args.phase in ("all", "eval-only"):
         models = discover_all_models()
 
@@ -532,9 +508,11 @@ def main():
         print(f"\nEvaluation completed in {elapsed/60:.1f} min")
 
         print_summary(results)
-        generate_report(results, DOCUMENTS_DIR / "full_ft_gsm8k_results.md")
+        generate_report(
+            results,
+            DOCUMENTS_DIR / "full_ft_gsm8k_results_wait_recompute.md",
+        )
 
-    # ---- Summary only ----
     if args.phase == "summary-only":
         results_file = EVAL_ROOT / "all_results.json"
         if not results_file.exists():
@@ -542,7 +520,10 @@ def main():
             return
         results = {r["name"]: r for r in json.loads(results_file.read_text())}
         print_summary(results)
-        generate_report(results, DOCUMENTS_DIR / "full_ft_gsm8k_results.md")
+        generate_report(
+            results,
+            DOCUMENTS_DIR / "full_ft_gsm8k_results_wait_recompute.md",
+        )
 
     total_elapsed = time.time() - t_global
     print(f"\n{'=' * 70}")

@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 """
-Full FT Phase 2 sweep + GSM8K evaluation (vLLM).
+Phase 3 LoRA sweep + GSM8K evaluation (vLLM) — Wait+Recompute dataset.
 
-Phase 1 found LR=1e-6 with epoch=3 as the most promising regime.
-Phase 2 explores weight decay and warmup at this fixed LR/epoch:
-  - Group A: WD sweep   (warmup=0.1 fixed)
-  - Group B: Warmup sweep (wd=0.01 fixed)
-  - Group C: Cross of promising WD x warmup
+Same experiment grid as 18_sweep_v3_and_eval.py but trained on the
+wait+recompute prefill dataset:
+  pos = [step1, old_step2, "Wait, ...", corrected_step2, tail]
 
 Usage:
-    python 19_full_ft_sweep_v2.py --gpus 0,1,2,3
-    python 19_full_ft_sweep_v2.py --phase eval-only --gpus 0,1,2,3
-    python 19_full_ft_sweep_v2.py --phase train-only --gpus 0,1,2,3
-    python 19_full_ft_sweep_v2.py --phase summary-only
+    python 18b_sweep_v3_wait_recompute.py --gpus 0,1,2,3
+    python 18b_sweep_v3_wait_recompute.py --phase eval-only --gpus 0,1,2,3
+    python 18b_sweep_v3_wait_recompute.py --phase train-only --gpus 0,1,2,3
+    python 18b_sweep_v3_wait_recompute.py --phase summary-only
 """
 
 import argparse
@@ -26,13 +24,13 @@ from typing import Any, Dict, List, Optional
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCRIPTS_ROOT = SCRIPT_DIR.parent
 PROJECT_ROOT = SCRIPTS_ROOT.parent
-TRAIN_SCRIPT = SCRIPT_DIR / "13_full_finetune.py"
+TRAIN_SCRIPT = SCRIPT_DIR / "05_finetune_lora_same_dataset.py"
 HARNESS_DIR = PROJECT_ROOT / "lm-evaluation-harness"
 DOCUMENTS_DIR = PROJECT_ROOT / "documents"
 
 ARTIFACTS_LOCAL = PROJECT_ROOT / "artifacts_local"
-DATASET_PREFILL = PROJECT_ROOT / "artifacts_real" / "samples_gsm8k_train_ds2_fix_step2_gpt_prefill.json"
-SWEEP_ROOT = ARTIFACTS_LOCAL / "full_ft_sweep"
+DATASET_PREFILL = PROJECT_ROOT / "artifacts_real" / "samples_gsm8k_train_ds2_wait_recompute_gpt_prefill.json"
+SWEEP_ROOT = ARTIFACTS_LOCAL / "lora_sweep_wr"
 EVAL_ROOT = SWEEP_ROOT / "_gsm8k_vllm_eval"
 
 MODEL_ID = "Qwen/Qwen2.5-3B-Instruct"
@@ -47,102 +45,89 @@ VLLM_COMMON_ARGS = (
     "enforce_eager=True"
 )
 
+ALL_MODULES = "q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj"
+ATTN_MODULES = "q_proj,k_proj,v_proj,o_proj"
 
-# ============================================================
-# Phase 2 experiment definitions
-# ============================================================
 
-def build_phase2_experiments() -> List[Dict[str, Any]]:
-    """
-    Phase 1 found:
-      - LR=1e-6, ep=3, wd=0.01, warmup=0.1 → EM=0.8446 (#2 overall)
-      - LR=5e-6, ep=3, wd=0.01, warmup=0.1 → EM=0.8461 (#1 overall)
-      - WD and warmup were underexplored at the ultra-low LR regime.
-
-    Phase 2 fixes lr=1e-6, epochs=3, and sweeps WD and warmup.
-    ft_lr1e6 (wd=0.01, warmup=0.1) already exists — skipped below.
-    """
+def build_phase3_experiments() -> List[Dict[str, Any]]:
     exps: List[Dict[str, Any]] = []
 
-    def add(name: str, desc: str = "", lr: float = 1e-6, epochs: float = 3,
-            wd: float = 0.01, warmup: float = 0.1, ga_steps: int = 16):
+    def add(name: str, lr: float = 1e-5, r: int = 16, alpha: int = 32,
+            dropout: float = 0.05, epochs: float = 5, wd: float = 0.0,
+            warmup: float = 0.03, ga_steps: int = 16,
+            modules: str = ALL_MODULES):
         exps.append(dict(
-            name=name, desc=desc, lr=lr, epochs=epochs, wd=wd,
-            warmup=warmup, ga_steps=ga_steps,
+            name=name, lr=lr, r=r, alpha=alpha, dropout=dropout,
+            epochs=epochs, wd=wd, warmup=warmup, ga_steps=ga_steps,
+            modules=modules,
         ))
 
-    # --- Group A: WD sweep (warmup=0.1 fixed, lr=1e-6, ep=3) ---
-    add("ft2_wd0",    desc="WD=0.0 at lr=1e-6",   wd=0.0)
-    add("ft2_wd0005", desc="WD=0.005 at lr=1e-6",  wd=0.005)
-    add("ft2_wd005",  desc="WD=0.05 at lr=1e-6",   wd=0.05)
-    add("ft2_wd01",   desc="WD=0.1 at lr=1e-6",    wd=0.1)
+    add("v3_lr1e6_r16_attn", lr=1e-6, r=16, alpha=32, modules=ATTN_MODULES)
+    add("v3_lr5e6_r16_attn", lr=5e-6, r=16, alpha=32, modules=ATTN_MODULES)
+    add("v3_lr1e5_r16_attn", lr=1e-5, r=16, alpha=32, modules=ATTN_MODULES)
 
-    # --- Group B: Warmup sweep (wd=0.01 fixed, lr=1e-6, ep=3) ---
-    add("ft2_wu0",   desc="Warmup=0.0 at lr=1e-6",  warmup=0.0)
-    add("ft2_wu005", desc="Warmup=0.05 at lr=1e-6",  warmup=0.05)
-    add("ft2_wu02",  desc="Warmup=0.2 at lr=1e-6",   warmup=0.2)
-    add("ft2_wu03",  desc="Warmup=0.3 at lr=1e-6",   warmup=0.3)
+    add("v3_lr1e6_r4_a1x", lr=1e-6, r=4, alpha=4)
+    add("v3_lr5e6_r4_a1x", lr=5e-6, r=4, alpha=4)
+    add("v3_lr1e5_r4_a1x", lr=1e-5, r=4, alpha=4)
 
-    # --- Group C: Cross of promising WD x warmup ---
-    add("ft2_wd0_wu02",  desc="WD=0 + warmup=0.2",
-        wd=0.0, warmup=0.2)
-    add("ft2_wd01_wu02", desc="WD=0.1 + warmup=0.2",
-        wd=0.1, warmup=0.2)
+    add("v3_lr1e6_r4_attn", lr=1e-6, r=4, alpha=4, modules=ATTN_MODULES)
+    add("v3_lr5e6_r4_attn", lr=5e-6, r=4, alpha=4, modules=ATTN_MODULES)
+    add("v3_lr1e5_r4_attn", lr=1e-5, r=4, alpha=4, modules=ATTN_MODULES)
+
+    add("v3_lr1e6_r16_all", lr=1e-6, r=16, alpha=32)
+    add("v3_lr5e6_r16_all", lr=5e-6, r=16, alpha=32)
+
+    add("v3_lr1e5_r16_a1x_attn", lr=1e-5, r=16, alpha=16, modules=ATTN_MODULES)
+    add("v3_lr1e5_r4_a2x_attn",  lr=1e-5, r=4,  alpha=8,  modules=ATTN_MODULES)
 
     return exps
 
-
-# ============================================================
-# Training
-# ============================================================
 
 def launch_training(exp: Dict, gpu_id: int) -> subprocess.Popen:
     name = exp["name"]
     output_dir = SWEEP_ROOT / name
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    train_args = " ".join([
-        f"--model-id {MODEL_ID}",
-        f"--dataset-path {DATASET_PREFILL}",
-        f"--output-dir {output_dir}",
-        f"--learning-rate {exp['lr']}",
-        f"--num-train-epochs {exp['epochs']}",
-        f"--weight-decay {exp['wd']}",
-        f"--warmup-ratio {exp['warmup']}",
-        f"--gradient-accumulation-steps {exp['ga_steps']}",
-        "--per-device-train-batch-size 1",
-        "--logging-steps 1",
-        "--eval-steps 7",
-        "--save-steps 7",
-        "--save-total-limit 2",
-        "--seed 42",
-    ])
+    cmd = [
+        PYTHON_BIN, str(TRAIN_SCRIPT),
+        "--model-id",    MODEL_ID,
+        "--dataset-path", str(DATASET_PREFILL),
+        "--output-dir",  str(output_dir),
+        "--lora-r",      str(exp["r"]),
+        "--lora-alpha",  str(exp["alpha"]),
+        "--lora-dropout", str(exp["dropout"]),
+        "--target-modules", exp["modules"],
+        "--num-train-epochs", str(exp["epochs"]),
+        "--learning-rate",    str(exp["lr"]),
+        "--weight-decay",     str(exp["wd"]),
+        "--warmup-ratio",     str(exp["warmup"]),
+        "--gradient-accumulation-steps", str(exp["ga_steps"]),
+        "--per-device-train-batch-size", "1",
+        "--logging-steps",    "1",
+        "--eval-steps",       "7",
+        "--save-steps",       "9999",
+        "--save-total-limit", "1",
+        "--seed",             "42",
+    ]
 
-    bash_cmd = (
-        f"export CUDA_VISIBLE_DEVICES={gpu_id}; "
-        f"export PYTHONUNBUFFERED=1; "
-        f"export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True; "
-        f"{PYTHON_BIN} {TRAIN_SCRIPT} {train_args}"
-    )
+    env = os.environ.copy()
+    env["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
 
     log_file = output_dir / "training.log"
     fh = open(log_file, "w")
-    proc = subprocess.Popen(
-        ["/bin/bash", "-c", bash_cmd],
-        stdout=fh, stderr=subprocess.STDOUT,
-        start_new_session=True,
-    )
+    proc = subprocess.Popen(cmd, stdout=fh, stderr=subprocess.STDOUT, env=env)
     proc._log_fh = fh  # type: ignore[attr-defined]
     return proc
 
 
 def run_training_sweep(experiments: List[Dict], gpus: List[int]):
     SWEEP_ROOT.mkdir(parents=True, exist_ok=True)
+    batch_size = len(gpus)
 
     skipped, to_run = [], []
     for exp in experiments:
-        model_path = SWEEP_ROOT / exp["name"] / "best_model"
-        if model_path.exists() and (model_path / "config.json").exists():
+        adapter_path = SWEEP_ROOT / exp["name"] / "final_adapter"
+        if adapter_path.exists():
             skipped.append(exp["name"])
         else:
             to_run.append(exp)
@@ -150,15 +135,14 @@ def run_training_sweep(experiments: List[Dict], gpus: List[int]):
     if skipped:
         print(f"Skipping {len(skipped)} already-trained: {skipped}")
     if not to_run:
-        print("All Phase 2 experiments already completed!")
+        print("All Phase 3 experiments already completed!")
         return
 
-    n_gpus = len(gpus)
-    total_batches = (len(to_run) + n_gpus - 1) // n_gpus
+    total_batches = (len(to_run) + batch_size - 1) // batch_size
 
     for batch_idx in range(total_batches):
-        batch_start = batch_idx * n_gpus
-        batch = to_run[batch_start: batch_start + n_gpus]
+        batch_start = batch_idx * batch_size
+        batch = to_run[batch_start: batch_start + batch_size]
 
         print(f"\n{'=' * 70}")
         print(f"TRAIN BATCH {batch_idx + 1}/{total_batches}  |  "
@@ -167,29 +151,20 @@ def run_training_sweep(experiments: List[Dict], gpus: List[int]):
 
         procs = []
         for i, exp in enumerate(batch):
-            gpu = gpus[i % n_gpus]
+            gpu = gpus[i % len(gpus)]
             print(f"  Launching {exp['name']} on GPU {gpu} ...")
             proc = launch_training(exp, gpu)
             procs.append((exp["name"], proc))
-            time.sleep(10)
+            time.sleep(15)
 
         for name, proc in procs:
             proc.wait()
             proc._log_fh.close()  # type: ignore[attr-defined]
-            if proc.returncode != 0:
-                try:
-                    os.killpg(os.getpgid(proc.pid), 9)
-                except (ProcessLookupError, PermissionError):
-                    pass
             status = "OK" if proc.returncode == 0 else f"FAILED (rc={proc.returncode})"
             print(f"  {name}: {status}")
 
-    print(f"\nAll Phase 2 full FT training completed.")
+    print(f"\nAll Phase 3 training completed.")
 
-
-# ============================================================
-# GSM8K Evaluation (vLLM)
-# ============================================================
 
 def find_latest_results(run_dir: Path) -> Optional[Path]:
     candidates = sorted(run_dir.rglob("results_*.json"))
@@ -238,14 +213,13 @@ def run_vllm_eval(model_args: str, output_path: Path, gpu_id: int,
 
     log_file = output_path / "eval.log"
     fh = open(log_file, "w")
-    proc = subprocess.Popen(cmd, stdout=fh, stderr=subprocess.STDOUT,
-                            cwd=str(HARNESS_DIR), env=env)
+    proc = subprocess.Popen(cmd, stdout=fh, stderr=subprocess.STDOUT, env=env)
     proc._log_fh = fh  # type: ignore[attr-defined]
     return proc
 
 
-def load_training_metrics(exp_dir: Path) -> Dict[str, Any]:
-    mf = exp_dir / "sweep_metrics.json"
+def load_training_metrics(adapter_dir: Path) -> Dict[str, Any]:
+    mf = adapter_dir / "sweep_metrics.json"
     if not mf.exists():
         return {}
     m = json.loads(mf.read_text())
@@ -259,36 +233,76 @@ def load_training_metrics(exp_dir: Path) -> Dict[str, Any]:
         "best_eval_loss": best_eval,
         "train_loss": m.get("train_metrics", {}).get("train_loss"),
         "lr": cfg.get("learning_rate"),
+        "r": cfg.get("lora_r"),
+        "alpha": cfg.get("lora_alpha"),
+        "dropout": cfg.get("lora_dropout"),
         "epochs": cfg.get("num_train_epochs"),
         "wd": cfg.get("weight_decay"),
         "warmup": cfg.get("warmup_ratio"),
+        "modules": cfg.get("target_modules"),
+        "train_samples": cfg.get("train_samples"),
     }
 
 
-def discover_all_models() -> List[Dict[str, Any]]:
-    models = []
+def discover_all_adapters() -> List[Dict[str, Any]]:
+    adapters = []
     for d in sorted(SWEEP_ROOT.iterdir()):
         if not d.is_dir() or d.name.startswith("_"):
             continue
-        model_path = d / "best_model"
-        if not model_path.exists() or not (model_path / "config.json").exists():
+        adapter_path = d / "final_adapter"
+        if not adapter_path.exists():
             continue
         training = load_training_metrics(d)
-        phase = "v2" if d.name.startswith("ft2_") else "v1"
-        models.append({
+
+        if d.name.startswith("v3_"):
+            phase = "v3"
+        elif d.name.startswith("v2_"):
+            phase = "v2"
+        else:
+            phase = "v1"
+
+        adapters.append({
             "name": d.name,
-            "model_path": str(model_path),
+            "adapter_path": str(adapter_path),
             "phase": phase,
             **training,
         })
-    return models
+    return adapters
 
 
 def save_incremental(path: Path, results: Dict[str, Dict]):
     path.write_text(json.dumps(list(results.values()), indent=2, default=str))
 
 
-def run_parallel_eval(models: List[Dict], gpus: List[int],
+def merge_lora_adapter(adapter_path: str, output_dir: Path) -> Path:
+    """Merge LoRA adapter into base model, return path to merged model."""
+    merged_path = output_dir / "merged_model"
+    if merged_path.exists() and (merged_path / "config.json").exists():
+        return merged_path
+    merged_path.mkdir(parents=True, exist_ok=True)
+    merge_script = (
+        f"import torch; "
+        f"from peft import PeftModel; "
+        f"from transformers import AutoModelForCausalLM, AutoTokenizer; "
+        f"base = AutoModelForCausalLM.from_pretrained('{MODEL_ID}', torch_dtype=torch.float16); "
+        f"model = PeftModel.from_pretrained(base, '{adapter_path}'); "
+        f"merged = model.merge_and_unload(); "
+        f"merged.save_pretrained('{merged_path}'); "
+        f"AutoTokenizer.from_pretrained('{MODEL_ID}').save_pretrained('{merged_path}'); "
+        f"print('Merged to', '{merged_path}')"
+    )
+    proc = subprocess.run(
+        [PYTHON_BIN, "-c", merge_script],
+        capture_output=True, text=True,
+        env={**os.environ, "CUDA_VISIBLE_DEVICES": ""}
+    )
+    if proc.returncode != 0:
+        print(f"  Merge FAILED: {proc.stderr[-500:]}")
+        return Path("")
+    return merged_path
+
+
+def run_parallel_eval(adapters: List[Dict], gpus: List[int],
                       batch_size: str, limit: int) -> Dict[str, Dict]:
     EVAL_ROOT.mkdir(parents=True, exist_ok=True)
     incremental_file = EVAL_ROOT / "all_results.json"
@@ -318,78 +332,106 @@ def run_parallel_eval(models: List[Dict], gpus: List[int],
     else:
         print(f"[BASE] Already done: exact_match = {done['base'].get('gsm8k_em')}")
 
-    to_eval = [m for m in models if m["name"] not in done]
-    print(f"\nModels to evaluate: {len(to_eval)} "
-          f"(skipping {len(models) - len(to_eval)} already done)")
+    to_eval = [a for a in adapters if a["name"] not in done]
+    print(f"\nAdapters to evaluate: {len(to_eval)} "
+          f"(skipping {len(adapters) - len(to_eval)} already done)")
 
     if not to_eval:
         print("All evaluations already completed!")
         return done
 
-    gpu = gpus[0]
+    # Merge LoRA adapters into base model (CPU only, sequential)
+    print(f"\nMerging {len(to_eval)} LoRA adapters into base model ...")
+    for adapter in to_eval:
+        name = adapter["name"]
+        merged = merge_lora_adapter(
+            adapter["adapter_path"], SWEEP_ROOT / name)
+        adapter["merged_path"] = str(merged)
+        if merged.exists():
+            print(f"  {name}: merged OK")
+        else:
+            print(f"  {name}: merge FAILED")
 
-    for idx, model_info in enumerate(to_eval):
-        name = model_info["name"]
-        model_args = f"pretrained={model_info['model_path']},{VLLM_COMMON_ARGS}"
+    valid_adapters = [a for a in to_eval
+                      if a.get("merged_path") and Path(a["merged_path"]).exists()]
+    skipped = [a for a in to_eval if a not in valid_adapters]
+    for a in skipped:
+        print(f"  Skipping {a['name']} (no merged model)")
+
+    n_gpus = len(gpus)
+    total_batches = (len(valid_adapters) + n_gpus - 1) // n_gpus
+
+    for batch_idx in range(total_batches):
+        batch_start = batch_idx * n_gpus
+        batch = valid_adapters[batch_start: batch_start + n_gpus]
 
         print(f"\n{'=' * 70}")
-        print(f"EVAL {idx + 1}/{len(to_eval)}  |  {name}  |  GPU {gpu}")
+        print(f"EVAL BATCH {batch_idx + 1}/{total_batches}  |  "
+              f"{[a['name'] for a in batch]}")
         print(f"{'=' * 70}")
 
-        t0 = time.time()
-        proc = run_vllm_eval(
-            model_args, EVAL_ROOT / name, gpu, batch_size, limit)
-        proc.wait()
-        proc._log_fh.close()  # type: ignore[attr-defined]
-        elapsed = time.time() - t0
+        procs = []
+        for i, adapter in enumerate(batch):
+            gpu = gpus[i % n_gpus]
+            name = adapter["name"]
+            merged_path = adapter["merged_path"]
+            model_args = f"pretrained={merged_path},{VLLM_COMMON_ARGS}"
+            print(f"  Launching {name} on GPU {gpu} ...")
+            proc = run_vllm_eval(
+                model_args, EVAL_ROOT / name, gpu, batch_size, limit)
+            procs.append((adapter, proc, time.time()))
+            time.sleep(3)
 
-        rj = find_latest_results(EVAL_ROOT / name)
-        em = extract_exact_match(rj) if rj else None
-        status = f"EM = {em:.4f}" if em is not None else "FAILED"
-        print(f"  {name}: {status}  ({elapsed:.0f}s)")
+        for adapter, proc, t0 in procs:
+            proc.wait()
+            proc._log_fh.close()  # type: ignore[attr-defined]
+            elapsed = time.time() - t0
+            name = adapter["name"]
 
-        done[name] = {
-            "name": name, "gsm8k_em": em,
-            "elapsed_sec": round(elapsed, 1),
-            "phase": model_info.get("phase"),
-            "method": "full_ft",
-            "eval_loss": model_info.get("eval_loss"),
-            "best_eval_loss": model_info.get("best_eval_loss"),
-            "train_loss": model_info.get("train_loss"),
-            "lr": model_info.get("lr"),
-            "epochs": model_info.get("epochs"),
-            "wd": model_info.get("wd"),
-            "warmup": model_info.get("warmup"),
-        }
+            rj = find_latest_results(EVAL_ROOT / name)
+            em = extract_exact_match(rj) if rj else None
+            status = f"EM = {em:.4f}" if em is not None else "FAILED"
+            print(f"  {name}: {status}  ({elapsed:.0f}s)")
+
+            done[name] = {
+                "name": name, "gsm8k_em": em,
+                "elapsed_sec": round(elapsed, 1),
+                "phase": adapter.get("phase"),
+                "eval_loss": adapter.get("eval_loss"),
+                "best_eval_loss": adapter.get("best_eval_loss"),
+                "train_loss": adapter.get("train_loss"),
+                "lr": adapter.get("lr"),
+                "r": adapter.get("r"),
+                "alpha": adapter.get("alpha"),
+                "dropout": adapter.get("dropout"),
+                "epochs": adapter.get("epochs"),
+                "wd": adapter.get("wd"),
+                "warmup": adapter.get("warmup"),
+                "modules": adapter.get("modules"),
+            }
 
         save_incremental(incremental_file, done)
-        remaining = len(to_eval) - (idx + 1)
-        print(f"  Saved. Remaining: {remaining} models")
+        remaining = len(valid_adapters) - (batch_start + len(batch))
+        print(f"  Saved. Remaining: {remaining} adapters")
 
     return done
 
 
-# ============================================================
-# Report
-# ============================================================
-
-def generate_report(results: Dict[str, Dict], output_path: Path,
-                    experiments: Optional[List[Dict]] = None):
+def generate_report(results: Dict[str, Dict], output_path: Path):
     base_em = results.get("base", {}).get("gsm8k_em")
-    ft_results = sorted(
+    adapter_results = sorted(
         [(n, r) for n, r in results.items() if n != "base"],
         key=lambda x: -(x[1].get("gsm8k_em") or -1)
     )
-    ok = [(n, r) for n, r in ft_results if r.get("gsm8k_em") is not None]
+    ok = [(n, r) for n, r in adapter_results if r.get("gsm8k_em") is not None]
 
     lines = [
-        "# Full Fine-Tuning Sweep — Phase 1+2 GSM8K Results",
+        "# GSM8K LoRA Sweep — Wait+Recompute Dataset Results",
         "",
         f"**Base Model**: `{MODEL_ID}`",
-        "**Method**: Full parameter fine-tuning (no LoRA)",
-        "**Optimizer**: paged_adamw_8bit (bitsandbytes)",
         f"**Task**: `{TASK}` (GSM8K zero-shot CoT, 1319 test samples)",
-        "**Training Data**: ~109 train / ~6 eval samples",
+        "**Training Data**: Wait+Recompute prefill dataset "
+        "(pos = step1 + old_step2 + Wait... + corrected_step2 + tail)",
         "**Evaluation Backend**: vLLM (bf16, greedy decoding, max_gen_toks=2048)",
         f"**Date**: {time.strftime('%Y-%m-%d %H:%M')}",
         "",
@@ -398,12 +440,12 @@ def generate_report(results: Dict[str, Dict], output_path: Path,
         "",
         "## Full Results (Ranked by GSM8K Exact Match)", "",
         "| Rank | Name | Phase | GSM8K EM | Delta | Eval Loss | Best EL "
-        "| Train Loss | LR | Epochs | WD | Warmup |",
+        "| Train Loss | LR | r | Alpha | Epochs | Drop | WD |",
         "|------|------|-------|----------|-------|-----------|--------"
-        "|------------|-----|--------|-----|--------|",
+        "|------------|-----|---|-------|--------|------|-----|",
     ]
 
-    for i, (name, r) in enumerate(ft_results):
+    for i, (name, r) in enumerate(adapter_results):
         em = r.get("gsm8k_em")
         em_str = f"{em:.4f}" if em is not None else "FAIL"
         delta = (em - base_em) if (em is not None and base_em is not None) else None
@@ -417,26 +459,29 @@ def generate_report(results: Dict[str, Dict], output_path: Path,
         lines.append(
             f"| {i+1} | {name} | {phase} | {em_str} | {delta_str} | "
             f"{el} | {bel} | {tl} | {lr_str} | "
-            f"{r.get('epochs', '—')} | {r.get('wd', '—')} | "
-            f"{r.get('warmup', '—')} |"
+            f"{r.get('r', '—')} | {r.get('alpha', '—')} | "
+            f"{r.get('epochs', '—')} | {r.get('dropout', '—')} | "
+            f"{r.get('wd', '—')} |"
         )
 
     if ok and base_em is not None:
         best_name, best_r = ok[0]
         worst_name, worst_r = ok[-1]
         improved = [x for x in ok if x[1]["gsm8k_em"] > base_em]
+
         lines.extend(["", "## Key Findings", "",
-            f"- **Best full FT**: `{best_name}` "
+            f"- **Best adapter**: `{best_name}` "
             f"(EM = {best_r['gsm8k_em']:.4f}, "
             f"delta = {best_r['gsm8k_em'] - base_em:+.4f})",
-            f"- **Worst full FT**: `{worst_name}` "
+            f"- **Worst adapter**: `{worst_name}` "
             f"(EM = {worst_r['gsm8k_em']:.4f}, "
             f"delta = {worst_r['gsm8k_em'] - base_em:+.4f})",
-            f"- **{len(improved)}/{len(ok)}** experiments improved over base",
+            f"- **{len(improved)}/{len(ok)}** adapters improved over base",
         ])
 
     lines.extend(["", "---", "",
-                   f"*Generated: {time.strftime('%Y-%m-%d %H:%M')}*", ""])
+                   f"*Generated: {time.strftime('%Y-%m-%d %H:%M')}*",
+                   f"*Full JSON: `{EVAL_ROOT / 'all_results.json'}`*", ""])
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines), encoding="utf-8")
@@ -445,20 +490,20 @@ def generate_report(results: Dict[str, Dict], output_path: Path,
 
 def print_summary(results: Dict[str, Dict]):
     base_em = results.get("base", {}).get("gsm8k_em")
-    ft_results = sorted(
+    adapter_results = sorted(
         [(n, r) for n, r in results.items() if n != "base"],
         key=lambda x: -(x[1].get("gsm8k_em") or -1)
     )
 
-    print(f"\n{'=' * 100}")
-    print(f"{'FULL FT Phase 1+2 — GSM8K RESULTS (vLLM)':^100}")
-    print(f"{'=' * 100}")
+    print(f"\n{'=' * 110}")
+    print(f"{'GSM8K LoRA — Wait+Recompute (vLLM)':^110}")
+    print(f"{'=' * 110}")
     print(f"\nBase model: {MODEL_ID}  |  GSM8K EM = {base_em}")
-    print(f"\n{'Rk':<4} {'Name':<20} {'Ph':<4} {'GSM8K EM':<10} {'Delta':<8} "
-          f"{'EvalLoss':<10} {'LR':<8} {'Ep':<5} {'WD':<6} {'WU':<6}")
-    print("-" * 100)
+    print(f"\n{'Rk':<4} {'Name':<30} {'Ph':<4} {'GSM8K EM':<10} "
+          f"{'Delta':<8} {'EvalLoss':<10} {'LR':<8} {'r':<4} {'α':<5} {'Ep':<5}")
+    print("-" * 110)
 
-    for i, (name, r) in enumerate(ft_results):
+    for i, (name, r) in enumerate(adapter_results):
         em = r.get("gsm8k_em")
         em_str = f"{em:.4f}" if em is not None else "FAIL"
         delta_str = f"{em - base_em:+.4f}" if (em and base_em) else "N/A"
@@ -466,22 +511,18 @@ def print_summary(results: Dict[str, Dict]):
         lr_val = r.get("lr")
         lr_str = f"{lr_val:.0e}" if lr_val is not None else "—"
         ph = r.get("phase", "—")
-        print(f"{i+1:<4} {name:<20} {ph:<4} {em_str:<10} {delta_str:<8} "
-              f"{el:<10} {lr_str:<8} {str(r.get('epochs', '—')):<5} "
-              f"{str(r.get('wd', '—')):<6} {str(r.get('warmup', '—')):<6}")
+        print(f"{i+1:<4} {name:<30} {ph:<4} {em_str:<10} {delta_str:<8} "
+              f"{el:<10} {lr_str:<8} {str(r.get('r', '—')):<4} "
+              f"{str(r.get('alpha', '—')):<5} {str(r.get('epochs', '—')):<5}")
 
-    ok = [(n, r) for n, r in ft_results if r.get("gsm8k_em") is not None]
+    ok = [(n, r) for n, r in adapter_results if r.get("gsm8k_em") is not None]
     if ok and base_em:
         improved = sum(1 for _, r in ok if r["gsm8k_em"] > base_em)
-        print(f"\n{improved}/{len(ok)} experiments beat base model")
+        print(f"\n{improved}/{len(ok)} adapters beat base model")
         best = ok[0]
         print(f"Best: {best[0]} (EM={best[1]['gsm8k_em']:.4f}, "
               f"delta={best[1]['gsm8k_em'] - base_em:+.4f})")
 
-
-# ============================================================
-# Main
-# ============================================================
 
 def main():
     ap = argparse.ArgumentParser()
@@ -496,16 +537,16 @@ def main():
     gpus = [int(x) for x in args.gpus.split(",")]
     t_global = time.time()
 
-    # ---- Phase 2 Training ----
     if args.phase in ("all", "train-only"):
-        experiments = build_phase2_experiments()
+        experiments = build_phase3_experiments()
 
         print(f"\n{'#' * 70}")
-        print(f"  FULL FT PHASE 2 TRAINING: {len(experiments)} experiments, "
-              f"{len(gpus)} GPUs")
+        print(f"  PHASE 3 LoRA TRAINING (Wait+Recompute): "
+              f"{len(experiments)} experiments, {len(gpus)} GPUs")
+        print(f"  Dataset: {DATASET_PREFILL}")
         print(f"{'#' * 70}")
 
-        plan_file = SWEEP_ROOT / "v2_experiment_plan.json"
+        plan_file = SWEEP_ROOT / "v3_experiment_plan.json"
         SWEEP_ROOT.mkdir(parents=True, exist_ok=True)
         plan_file.write_text(json.dumps(experiments, indent=2))
         print(f"Plan: {plan_file}")
@@ -513,28 +554,29 @@ def main():
         t0 = time.time()
         run_training_sweep(experiments, gpus)
         elapsed = time.time() - t0
-        print(f"\nPhase 2 training completed in {elapsed/60:.1f} min")
+        print(f"\nPhase 3 training completed in {elapsed/60:.1f} min")
 
-    # ---- GSM8K Evaluation ----
     if args.phase in ("all", "eval-only"):
-        models = discover_all_models()
+        adapters = discover_all_adapters()
 
         print(f"\n{'#' * 70}")
-        print(f"  GSM8K EVALUATION (vLLM)  |  {len(models)} models + base  |  "
+        print(f"  GSM8K EVALUATION (vLLM)  |  {len(adapters)} adapters + base  |  "
               f"{len(gpus)} GPUs")
         print(f"  Limit: {'full (1319)' if args.eval_limit == 0 else args.eval_limit}")
         print(f"{'#' * 70}")
 
         t0 = time.time()
         results = run_parallel_eval(
-            models, gpus, args.eval_batch_size, args.eval_limit)
+            adapters, gpus, args.eval_batch_size, args.eval_limit)
         elapsed = time.time() - t0
         print(f"\nEvaluation completed in {elapsed/60:.1f} min")
 
         print_summary(results)
-        generate_report(results, DOCUMENTS_DIR / "full_ft_gsm8k_results.md")
+        generate_report(
+            results,
+            DOCUMENTS_DIR / "LoRA_gsm8k_eval_results_wait_recompute.md",
+        )
 
-    # ---- Summary only ----
     if args.phase == "summary-only":
         results_file = EVAL_ROOT / "all_results.json"
         if not results_file.exists():
@@ -542,7 +584,10 @@ def main():
             return
         results = {r["name"]: r for r in json.loads(results_file.read_text())}
         print_summary(results)
-        generate_report(results, DOCUMENTS_DIR / "full_ft_gsm8k_results.md")
+        generate_report(
+            results,
+            DOCUMENTS_DIR / "LoRA_gsm8k_eval_results_wait_recompute.md",
+        )
 
     total_elapsed = time.time() - t_global
     print(f"\n{'=' * 70}")

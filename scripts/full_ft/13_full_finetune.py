@@ -224,6 +224,7 @@ def main():
         args.model_id,
         torch_dtype=torch.bfloat16,
         trust_remote_code=True,
+        attn_implementation="sdpa",
     ).to("cuda:0")
     model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     model.config.use_cache = False
@@ -257,6 +258,7 @@ def main():
         greater_is_better=False,
         bf16=True,
         gradient_checkpointing=True,
+        gradient_checkpointing_kwargs={"use_reentrant": False},
         optim=args.optim,
         seed=args.seed,
         report_to=[],
