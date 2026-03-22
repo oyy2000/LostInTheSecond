@@ -52,3 +52,5 @@ vectors_out/
 *.pt
 *.bin
 *.safetensors
+logs/
+artifacts_real/
