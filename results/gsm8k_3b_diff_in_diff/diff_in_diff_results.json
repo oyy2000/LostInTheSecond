@@ -1,0 +1,202 @@
+[
+  {
+    "layer": 0,
+    "early_steps": [
+      1,
+      2
+    ],
+    "late_steps": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "auc_early_orig": 0.5,
+    "auc_late_orig": 0.5,
+    "auc_early_corr": 0.5593462044756473,
+    "auc_late_corr": 0.44418372057239575,
+    "observed_delta": -0.11516248390325157,
+    "p_value": 0.155,
+    "n_pairs": 347
+  },
+  {
+    "layer": 4,
+    "early_steps": [
+      1,
+      2
+    ],
+    "late_steps": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "auc_early_orig": 0.5,
+    "auc_late_orig": 0.5,
+    "auc_early_corr": 0.6568670469504169,
+    "auc_late_corr": 0.7866412213740458,
+    "observed_delta": 0.12977417442362893,
+    "p_value": 0.025,
+    "n_pairs": 347
+  },
+  {
+    "layer": 8,
+    "early_steps": [
+      1,
+      2
+    ],
+    "late_steps": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "auc_early_orig": 0.5,
+    "auc_late_orig": 0.5,
+    "auc_early_corr": 0.658008658008658,
+    "auc_late_corr": 0.7759287925696594,
+    "observed_delta": 0.11792013456100137,
+    "p_value": 0.03,
+    "n_pairs": 347
+  },
+  {
+    "layer": 12,
+    "early_steps": [
+      1,
+      2
+    ],
+    "late_steps": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "auc_early_orig": 0.5,
+    "auc_late_orig": 0.5,
+    "auc_early_corr": 0.6649438202247191,
+    "auc_late_corr": 0.7683177717993352,
+    "observed_delta": 0.10337395157461615,
+    "p_value": 0.045,
+    "n_pairs": 347
+  },
+  {
+    "layer": 16,
+    "early_steps": [
+      1,
+      2
+    ],
+    "late_steps": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "auc_early_orig": 0.5,
+    "auc_late_orig": 0.5,
+    "auc_early_corr": 0.6592166879523201,
+    "auc_late_corr": 0.737566468564279,
+    "observed_delta": 0.07834978061195885,
+    "p_value": 0.13,
+    "n_pairs": 347
+  },
+  {
+    "layer": 20,
+    "early_steps": [
+      1,
+      2
+    ],
+    "late_steps": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "auc_early_orig": 0.5,
+    "auc_late_orig": 0.5,
+    "auc_early_corr": 0.8061531841652324,
+    "auc_late_corr": 0.835933806146572,
+    "observed_delta": 0.029780621981339572,
+    "p_value": 0.515,
+    "n_pairs": 347
+  },
+  {
+    "layer": 24,
+    "early_steps": [
+      1,
+      2
+    ],
+    "late_steps": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "auc_early_orig": 0.5,
+    "auc_late_orig": 0.5,
+    "auc_early_corr": 0.750106974753958,
+    "auc_late_corr": 0.873396934626212,
+    "observed_delta": 0.123289959872254,
+    "p_value": 0.02,
+    "n_pairs": 347
+  },
+  {
+    "layer": 28,
+    "early_steps": [
+      1,
+      2
+    ],
+    "late_steps": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "auc_early_orig": 0.5,
+    "auc_late_orig": 0.5,
+    "auc_early_corr": 0.7826271186440678,
+    "auc_late_corr": 0.8189159807423513,
+    "observed_delta": 0.036288862098283525,
+    "p_value": 0.48,
+    "n_pairs": 347
+  },
+  {
+    "layer": 32,
+    "early_steps": [
+      1,
+      2
+    ],
+    "late_steps": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "auc_early_orig": 0.5,
+    "auc_late_orig": 0.5,
+    "auc_early_corr": 0.7730206540447504,
+    "auc_late_corr": 0.8152452830188679,
+    "observed_delta": 0.042224628974117495,
+    "p_value": 0.375,
+    "n_pairs": 347
+  },
+  {
+    "layer": 36,
+    "early_steps": [
+      1,
+      2
+    ],
+    "late_steps": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "auc_early_orig": 0.5,
+    "auc_late_orig": 0.5,
+    "auc_early_corr": 0.871822033898305,
+    "auc_late_corr": 0.8174045801526718,
+    "observed_delta": -0.054417453745633226,
+    "p_value": 0.28,
+    "n_pairs": 347
+  }
+]

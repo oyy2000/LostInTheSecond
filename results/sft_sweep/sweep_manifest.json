@@ -1,0 +1,218 @@
+[
+  {
+    "name": "normal_lr1e-6_r4_ep5",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/normal_lr1e-6_r4_ep5.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/normal_lr1e-6_r4_ep5",
+    "scheme": "normal",
+    "lr": 1e-06,
+    "rank": 4,
+    "epochs": 5
+  },
+  {
+    "name": "normal_lr1e-6_r4_ep10",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/normal_lr1e-6_r4_ep10.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/normal_lr1e-6_r4_ep10",
+    "scheme": "normal",
+    "lr": 1e-06,
+    "rank": 4,
+    "epochs": 10
+  },
+  {
+    "name": "normal_lr1e-6_r16_ep5",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/normal_lr1e-6_r16_ep5.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/normal_lr1e-6_r16_ep5",
+    "scheme": "normal",
+    "lr": 1e-06,
+    "rank": 16,
+    "epochs": 5
+  },
+  {
+    "name": "normal_lr1e-6_r16_ep10",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/normal_lr1e-6_r16_ep10.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/normal_lr1e-6_r16_ep10",
+    "scheme": "normal",
+    "lr": 1e-06,
+    "rank": 16,
+    "epochs": 10
+  },
+  {
+    "name": "normal_lr5e-6_r4_ep5",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/normal_lr5e-6_r4_ep5.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/normal_lr5e-6_r4_ep5",
+    "scheme": "normal",
+    "lr": 5e-06,
+    "rank": 4,
+    "epochs": 5
+  },
+  {
+    "name": "normal_lr5e-6_r4_ep10",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/normal_lr5e-6_r4_ep10.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/normal_lr5e-6_r4_ep10",
+    "scheme": "normal",
+    "lr": 5e-06,
+    "rank": 4,
+    "epochs": 10
+  },
+  {
+    "name": "normal_lr5e-6_r16_ep5",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/normal_lr5e-6_r16_ep5.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/normal_lr5e-6_r16_ep5",
+    "scheme": "normal",
+    "lr": 5e-06,
+    "rank": 16,
+    "epochs": 5
+  },
+  {
+    "name": "normal_lr5e-6_r16_ep10",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/normal_lr5e-6_r16_ep10.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/normal_lr5e-6_r16_ep10",
+    "scheme": "normal",
+    "lr": 5e-06,
+    "rank": 16,
+    "epochs": 10
+  },
+  {
+    "name": "normal_lr1e-5_r4_ep5",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/normal_lr1e-5_r4_ep5.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/normal_lr1e-5_r4_ep5",
+    "scheme": "normal",
+    "lr": 1e-05,
+    "rank": 4,
+    "epochs": 5
+  },
+  {
+    "name": "normal_lr1e-5_r4_ep10",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/normal_lr1e-5_r4_ep10.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/normal_lr1e-5_r4_ep10",
+    "scheme": "normal",
+    "lr": 1e-05,
+    "rank": 4,
+    "epochs": 10
+  },
+  {
+    "name": "normal_lr1e-5_r16_ep5",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/normal_lr1e-5_r16_ep5.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/normal_lr1e-5_r16_ep5",
+    "scheme": "normal",
+    "lr": 1e-05,
+    "rank": 16,
+    "epochs": 5
+  },
+  {
+    "name": "normal_lr1e-5_r16_ep10",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/normal_lr1e-5_r16_ep10.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/normal_lr1e-5_r16_ep10",
+    "scheme": "normal",
+    "lr": 1e-05,
+    "rank": 16,
+    "epochs": 10
+  },
+  {
+    "name": "weighted_lr1e-6_r4_ep5",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/weighted_lr1e-6_r4_ep5.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/weighted_lr1e-6_r4_ep5",
+    "scheme": "weighted",
+    "lr": 1e-06,
+    "rank": 4,
+    "epochs": 5
+  },
+  {
+    "name": "weighted_lr1e-6_r4_ep10",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/weighted_lr1e-6_r4_ep10.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/weighted_lr1e-6_r4_ep10",
+    "scheme": "weighted",
+    "lr": 1e-06,
+    "rank": 4,
+    "epochs": 10
+  },
+  {
+    "name": "weighted_lr1e-6_r16_ep5",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/weighted_lr1e-6_r16_ep5.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/weighted_lr1e-6_r16_ep5",
+    "scheme": "weighted",
+    "lr": 1e-06,
+    "rank": 16,
+    "epochs": 5
+  },
+  {
+    "name": "weighted_lr1e-6_r16_ep10",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/weighted_lr1e-6_r16_ep10.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/weighted_lr1e-6_r16_ep10",
+    "scheme": "weighted",
+    "lr": 1e-06,
+    "rank": 16,
+    "epochs": 10
+  },
+  {
+    "name": "weighted_lr5e-6_r4_ep5",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/weighted_lr5e-6_r4_ep5.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/weighted_lr5e-6_r4_ep5",
+    "scheme": "weighted",
+    "lr": 5e-06,
+    "rank": 4,
+    "epochs": 5
+  },
+  {
+    "name": "weighted_lr5e-6_r4_ep10",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/weighted_lr5e-6_r4_ep10.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/weighted_lr5e-6_r4_ep10",
+    "scheme": "weighted",
+    "lr": 5e-06,
+    "rank": 4,
+    "epochs": 10
+  },
+  {
+    "name": "weighted_lr5e-6_r16_ep5",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/weighted_lr5e-6_r16_ep5.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/weighted_lr5e-6_r16_ep5",
+    "scheme": "weighted",
+    "lr": 5e-06,
+    "rank": 16,
+    "epochs": 5
+  },
+  {
+    "name": "weighted_lr5e-6_r16_ep10",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/weighted_lr5e-6_r16_ep10.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/weighted_lr5e-6_r16_ep10",
+    "scheme": "weighted",
+    "lr": 5e-06,
+    "rank": 16,
+    "epochs": 10
+  },
+  {
+    "name": "weighted_lr1e-5_r4_ep5",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/weighted_lr1e-5_r4_ep5.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/weighted_lr1e-5_r4_ep5",
+    "scheme": "weighted",
+    "lr": 1e-05,
+    "rank": 4,
+    "epochs": 5
+  },
+  {
+    "name": "weighted_lr1e-5_r4_ep10",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/weighted_lr1e-5_r4_ep10.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/weighted_lr1e-5_r4_ep10",
+    "scheme": "weighted",
+    "lr": 1e-05,
+    "rank": 4,
+    "epochs": 10
+  },
+  {
+    "name": "weighted_lr1e-5_r16_ep5",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/weighted_lr1e-5_r16_ep5.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/weighted_lr1e-5_r16_ep5",
+    "scheme": "weighted",
+    "lr": 1e-05,
+    "rank": 16,
+    "epochs": 5
+  },
+  {
+    "name": "weighted_lr1e-5_r16_ep10",
+    "config_path": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/weighted_lr1e-5_r16_ep10.yaml",
+    "output_dir": "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/results/sft_sweep/weighted_lr1e-5_r16_ep10",
+    "scheme": "weighted",
+    "lr": 1e-05,
+    "rank": 16,
+    "epochs": 10
+  }
+]
