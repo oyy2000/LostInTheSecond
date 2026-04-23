@@ -1,0 +1,36 @@
+{
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "K": 16,
+  "alphas": [
+    0.4,
+    0.5,
+    0.6
+  ],
+  "n_questions": 1319,
+  "n_suffix_per_draft_greedy": 7,
+  "n_suffix_per_draft_sampled": 7,
+  "greedy_accuracy": 0.8248673237300985,
+  "results": {
+    "alpha_0.4": {
+      "accuracy": 0.8536770280515542,
+      "total_tokens": 4165507,
+      "tokens_per_question": 3158.079605761941,
+      "gain_over_greedy": 0.028809704321455687,
+      "suffix_tokens": 3327672
+    },
+    "alpha_0.5": {
+      "accuracy": 0.8476118271417741,
+      "total_tokens": 3493810,
+      "tokens_per_question": 2648.8324488248672,
+      "gain_over_greedy": 0.022744503411675554,
+      "suffix_tokens": 2655975
+    },
+    "alpha_0.6": {
+      "accuracy": 0.8423047763457164,
+      "total_tokens": 2648315,
+      "tokens_per_question": 2007.8203184230479,
+      "gain_over_greedy": 0.01743745261561791,
+      "suffix_tokens": 1810480
+    }
+  }
+}

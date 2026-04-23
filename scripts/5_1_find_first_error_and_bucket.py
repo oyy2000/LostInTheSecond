@@ -82,7 +82,7 @@ def bucket_results(records: list) -> dict:
         if tau in EARLY_TAU and n >= 3:
             r["bucket"] = "early"
             early.append(r)
-        elif tau in LATE_TAU and n >= 6:
+        elif tau in LATE_TAU and n >= tau + 1:
             r["bucket"] = "late"
             late.append(r)
         else:

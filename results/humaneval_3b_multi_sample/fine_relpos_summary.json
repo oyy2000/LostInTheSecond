@@ -1,0 +1,85 @@
+{
+  "dataset": "HumanEval",
+  "n_bins": 3,
+  "n_questions": 9,
+  "aggregation": "per_question (doc_id), tau averaged across samples",
+  "bins": [
+    {
+      "idx": 0,
+      "label": "[0.50, 0.67)",
+      "short_label": "Q1",
+      "range": [
+        0.5,
+        0.5
+      ],
+      "n": 2,
+      "delta_mean": 0.375,
+      "delta_se": 0.37499999999999994,
+      "delta_median": 0.375,
+      "r_bad_mean": 0.125,
+      "r_fix_mean": 0.5
+    },
+    {
+      "idx": 1,
+      "label": "[0.67, 0.73)",
+      "short_label": "Q2",
+      "range": [
+        0.6666666666666666,
+        0.7142857142857143
+      ],
+      "n": 4,
+      "delta_mean": 0.0,
+      "delta_se": 0.0,
+      "delta_median": 0.0,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.0
+    },
+    {
+      "idx": 2,
+      "label": "[0.73, 0.86)",
+      "short_label": "Q3",
+      "range": [
+        0.75,
+        0.8571428571428571
+      ],
+      "n": 3,
+      "delta_mean": 0.5104166666666666,
+      "delta_se": 0.2797025329603657,
+      "delta_median": 0.5,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.5104166666666666
+    }
+  ],
+  "pairwise_tests": {
+    "Q1_vs_Q2": {
+      "welch_t": 1.0,
+      "welch_p": 0.5000000000000001,
+      "mann_whitney_U": 6.0,
+      "mann_whitney_p": 0.2888443663464849
+    },
+    "Q1_vs_Q3": {
+      "welch_t": -0.28946122999257606,
+      "welch_p": 0.7983488905723877,
+      "mann_whitney_U": 2.0,
+      "mann_whitney_p": 0.8
+    },
+    "Q2_vs_Q3": {
+      "welch_t": -1.8248553606734539,
+      "welch_p": 0.20957459979014875,
+      "mann_whitney_U": 0.0,
+      "mann_whitney_p": 0.03191120476963876
+    }
+  },
+  "kruskal_wallis": {
+    "H": 5.253333333333336,
+    "p": 0.07231912466076301
+  },
+  "jonckheere_terpstra": {
+    "z": 1.1274690420042432,
+    "p": 0.25954422240387454
+  },
+  "spearman": {
+    "rho": 0.4495611895592131,
+    "p": 0.22472415287922515
+  }
+}

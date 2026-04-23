@@ -1,0 +1,10 @@
+{
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "K": 8,
+  "n_questions": 1319,
+  "individual_accuracy": 0.8303639120545868,
+  "majority_vote_accuracy": 0.8559514783927218,
+  "total_tokens": 3343454,
+  "tokens_per_question": 2534.8400303260046,
+  "pass_at_k": 0.9219105382865808
+}

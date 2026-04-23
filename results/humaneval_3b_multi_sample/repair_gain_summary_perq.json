@@ -1,0 +1,93 @@
+{
+  "dataset": "HumanEval",
+  "by_bucket": {
+    "early": {
+      "n": 11,
+      "r_bad_mean": 0.022727272727272728,
+      "r_bad_se": 0.021669604301036184,
+      "r_fix_mean": 0.2111742424242424,
+      "r_fix_se": 0.0957150848228374,
+      "delta_mean": 0.1884469696969697,
+      "delta_se": 0.07982066552410834,
+      "delta_ttest_t": 2.2510102425604344,
+      "delta_ttest_p": 0.04809709741753889
+    },
+    "late": {
+      "n": 2,
+      "r_bad_mean": 0.0,
+      "r_bad_se": 0.0,
+      "r_fix_mean": 0.5,
+      "r_fix_se": 0.35355339059327373,
+      "delta_mean": 0.5,
+      "delta_se": 0.35355339059327373,
+      "delta_ttest_t": 1.0,
+      "delta_ttest_p": 0.5000000000000001
+    }
+  },
+  "by_tau": {
+    "2": {
+      "n": 4,
+      "r_bad_mean": 0.0625,
+      "r_fix_mean": 0.25,
+      "delta_mean": 0.1875,
+      "delta_se": 0.16237976320958225
+    },
+    "3": {
+      "n": 7,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.18898809523809526,
+      "delta_mean": 0.18898809523809526,
+      "delta_se": 0.08440080994941114
+    },
+    "5": {
+      "n": 1,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.0,
+      "delta_mean": 0.0,
+      "delta_se": 0.0
+    },
+    "6": {
+      "n": 1,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 1.0,
+      "delta_mean": 1.0,
+      "delta_se": 0.0
+    }
+  },
+  "between_bucket_test": {
+    "delta_early_mean": 0.1884469696969697,
+    "delta_late_mean": 0.5,
+    "welch_t": -0.6145514667203161,
+    "welch_p": 0.6446744689267312,
+    "mann_whitney_U": 8.5,
+    "mann_whitney_p": 0.6779670446130444,
+    "cohens_d": -0.5799946666305998,
+    "n_early": 11,
+    "n_late": 2
+  },
+  "relative_position_test": {
+    "spearman_rho_delta": 0.4585323528228427,
+    "spearman_p_delta": 0.25315978913353815,
+    "spearman_rho_r_bad": -0.5039526306789696,
+    "spearman_p_r_bad": 0.20288444914997816,
+    "median_split_welch_t": -0.6490405618025534,
+    "median_split_welch_p": 0.5415002816886529,
+    "terciles": {
+      "boundaries": [
+        0.6666666666666666,
+        0.7381785714285715
+      ],
+      "means": [
+        0.375,
+        0.0,
+        0.5104166666666666
+      ],
+      "ns": [
+        2,
+        3,
+        3
+      ]
+    }
+  },
+  "n_paired_samples": 13
+}

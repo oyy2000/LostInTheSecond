@@ -1,0 +1,38 @@
+{
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "K": 8,
+  "alphas": [
+    0.6,
+    0.7,
+    0.8
+  ],
+  "n_questions": 1319,
+  "results": {
+    "alpha_0.6": {
+      "accuracy": 0.8316906747536013,
+      "total_tokens": 1315898,
+      "suffix_tokens": 895769,
+      "draft_tokens": 420129,
+      "gain_over_greedy": 0.004548900682335155,
+      "tokens_per_question": 997.6482183472327
+    },
+    "alpha_0.7": {
+      "accuracy": 0.8271417740712661,
+      "total_tokens": 888705,
+      "suffix_tokens": 468576,
+      "draft_tokens": 420129,
+      "gain_over_greedy": 0.0,
+      "tokens_per_question": 673.7717968157696
+    },
+    "alpha_0.8": {
+      "accuracy": 0.8278999241849886,
+      "total_tokens": 661041,
+      "suffix_tokens": 240912,
+      "draft_tokens": 420129,
+      "gain_over_greedy": 0.0007581501137224889,
+      "tokens_per_question": 501.1683093252464
+    }
+  },
+  "greedy_accuracy": 0.8271417740712661,
+  "greedy_total_tokens": 420129
+}

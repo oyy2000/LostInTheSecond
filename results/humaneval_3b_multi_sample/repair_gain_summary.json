@@ -1,0 +1,93 @@
+{
+  "dataset": "HumanEval",
+  "by_bucket": {
+    "early": {
+      "n": 82,
+      "r_bad_mean": 0.024390243902439025,
+      "r_bad_se": 0.014044098094367751,
+      "r_fix_mean": 0.21036585365853658,
+      "r_fix_se": 0.04101023693748895,
+      "delta_mean": 0.18597560975609756,
+      "delta_se": 0.03754111755555467,
+      "delta_ttest_t": 4.923618304890997,
+      "delta_ttest_p": 4.406755467820749e-06
+    },
+    "late": {
+      "n": 16,
+      "r_bad_mean": 0.0,
+      "r_bad_se": 0.0,
+      "r_fix_mean": 0.5,
+      "r_fix_se": 0.125,
+      "delta_mean": 0.5,
+      "delta_se": 0.125,
+      "delta_ttest_t": 3.8729833462074175,
+      "delta_ttest_p": 0.0015017735386984273
+    }
+  },
+  "by_tau": {
+    "2": {
+      "n": 34,
+      "r_bad_mean": 0.058823529411764705,
+      "r_fix_mean": 0.23529411764705882,
+      "delta_mean": 0.17647058823529413,
+      "delta_se": 0.06110414609549034
+    },
+    "3": {
+      "n": 48,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.19270833333333334,
+      "delta_mean": 0.19270833333333334,
+      "delta_se": 0.04730106329493048
+    },
+    "5": {
+      "n": 8,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.0,
+      "delta_mean": 0.0,
+      "delta_se": 0.0
+    },
+    "6": {
+      "n": 8,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 1.0,
+      "delta_mean": 1.0,
+      "delta_se": 0.0
+    }
+  },
+  "between_bucket_test": {
+    "delta_early_mean": 0.18597560975609756,
+    "delta_late_mean": 0.5,
+    "welch_t": -2.3345504966881028,
+    "welch_p": 0.03159698277161037,
+    "mann_whitney_U": 448.0,
+    "mann_whitney_p": 0.014183543104800316,
+    "cohens_d": -0.7169778398761042,
+    "n_early": 82,
+    "n_late": 16
+  },
+  "relative_position_test": {
+    "spearman_rho_delta": 0.3223153416914215,
+    "spearman_p_delta": 0.008833023569154818,
+    "spearman_rho_r_bad": -0.34323908925005203,
+    "spearman_p_r_bad": 0.005123389275721172,
+    "median_split_welch_t": -1.972114546576557,
+    "median_split_welch_p": 0.05343932495977612,
+    "terciles": {
+      "boundaries": [
+        0.6666666666666666,
+        0.75
+      ],
+      "means": [
+        0.375,
+        0.0,
+        0.5108695652173914
+      ],
+      "ns": [
+        16,
+        26,
+        23
+      ]
+    }
+  },
+  "n_paired_samples": 98
+}

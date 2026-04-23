@@ -1,0 +1,386 @@
+[
+  {
+    "doc_id": "HumanEval/103",
+    "sample_idx": 0,
+    "prompt": "\ndef rounded_avg(n, m):\n    \"\"\"You are given two positive integers n and m, and your task is to compute the\n    average of the integers from n through m (including n and m). \n    Round the answer to the nearest integer and convert that to binary.\n    If n is greater than m, return -1.\n    Example:\n    rounded_avg(1, 5) => \"0b11\"\n    rounded_avg(7, 5) => -1\n    rounded_avg(10, 20) => \"0b1111\"\n    rounded_avg(20, 33) => \"0b11010\"\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(1, 5) == \"0b11\"\n    assert candidate(7, 13) == \"0b1010\"\n    assert candidate(964,977) == \"0b1111001010\"\n    assert candidate(996,997) == \"0b1111100100\"\n    assert candidate(560,851) == \"0b1011000010\"\n    assert candidate(185,546) == \"0b101101110\"\n    assert candidate(362,496) == \"0b110101101\"\n    assert candidate(350,902) == \"0b1001110010\"\n    assert candidate(197,233) == \"0b11010111\"\n\n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate(7, 5) == -1\n    assert candidate(5, 1) == -1\n    assert candidate(5, 5) == \"0b101\"\n\n",
+    "entry_point": "rounded_avg",
+    "code": "def rounded_avg(n, m):\n    if n > m:\n        return -1\n    \n    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)\n    \n    return \"0b\" + bin(rounded_avg)[2:]\n\n# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\"",
+    "blocks": [
+      "def rounded_avg(n, m):\n    if n > m:\n        return -1",
+      "    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)",
+      "    return \"0b\" + bin(rounded_avg)[2:]",
+      "# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\""
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "Block 2 uses integer division for the average, so rounding never changes the result and fractional averages are not correctly rounded to the nearest integer.",
+      "correction": "    total = sum(range(n, m + 1))\n    avg = total / (m - n + 1)\n    rounded_avg = round(avg)"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"Block 2 uses integer division for the average, so rounding never changes the result and fractional averages are not correctly rounded to the nearest integer.\",\n  \"correction\": \"    total = sum(range(n, m + 1))\\n    avg = total / (m - n + 1)\\n    rounded_avg = round(avg)\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/141",
+    "sample_idx": 0,
+    "prompt": "\ndef file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(\"example.txt\") == 'Yes'\n    assert candidate(\"1example.dll\") == 'No'\n    assert candidate('s1sdf3.asd') == 'No'\n    assert candidate('K.dll') == 'Yes'\n    assert candidate('MY16FILE3.exe') == 'Yes'\n    assert candidate('His12FILE94.exe') == 'No'\n    assert candidate('_Y.txt') == 'No'\n    assert candidate('?aREYA.exe') == 'No'\n    assert candidate('/this_is_valid.dll') == 'No'\n    assert candidate('this_is_valid.wow') == 'No'\n    assert candidate('this_is_valid.txt') == 'Yes'\n    assert candidate('this_is_valid.txtexe') == 'No'\n    assert candidate('#this2_i4s_5valid.ten') == 'No'\n    assert candidate('@this1_is6_valid.exe') == 'No'\n    assert candidate('this_is_12valid.6exe4.txt') == 'No'\n    assert candidate('all.exe.txt') == 'No'\n    assert candidate('I563_No.exe') == 'Yes'\n    assert candidate('Is3youfault.txt') == 'Yes'\n    assert candidate('no_one#knows.dll') == 'Yes'\n    assert candidate('1I563_Yes3.exe') == 'No'\n    assert candidate('I563_Yes3.txtt') == 'No'\n    assert candidate('final..txt') == 'No'\n    assert candidate('final132') == 'No'\n    assert candidate('_f4indsartal132.') == 'No'\n    \n        \n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate('.txt') == 'No'\n    assert candidate('s.') == 'No'\n\n",
+    "entry_point": "file_name_check",
+    "code": "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'\n    \n    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'\n    \n    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'\n    \n    return 'Yes'",
+    "blocks": [
+      "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'",
+      "    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'",
+      "    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'",
+      "    return 'Yes'"
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "Block 2 fails to ensure that the substring before the dot is non-empty and starts with a letter, and it does not guard against the dot being the first character, which can cause incorrect acceptance or an index error.",
+      "correction": "    # Check for exactly one dot and non-empty name before dot starting with a letter\n    if file_name.count('.') != 1:\n        return 'No'\n    name, dot, ext = file_name.partition('.')\n    if not name or not name[0].isalpha():\n        return 'No'"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"Block 2 fails to ensure that the substring before the dot is non-empty and starts with a letter, and it does not guard against the dot being the first character, which can cause incorrect acceptance or an index error.\",\n  \"correction\": \"    # Check for exactly one dot and non-empty name before dot starting with a letter\\n    if file_name.count('.') != 1:\\n        return 'No'\\n    name, dot, ext = file_name.partition('.')\\n    if not name or not name[0].isalpha():\\n        return 'No'\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/103",
+    "sample_idx": 1,
+    "prompt": "\ndef rounded_avg(n, m):\n    \"\"\"You are given two positive integers n and m, and your task is to compute the\n    average of the integers from n through m (including n and m). \n    Round the answer to the nearest integer and convert that to binary.\n    If n is greater than m, return -1.\n    Example:\n    rounded_avg(1, 5) => \"0b11\"\n    rounded_avg(7, 5) => -1\n    rounded_avg(10, 20) => \"0b1111\"\n    rounded_avg(20, 33) => \"0b11010\"\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(1, 5) == \"0b11\"\n    assert candidate(7, 13) == \"0b1010\"\n    assert candidate(964,977) == \"0b1111001010\"\n    assert candidate(996,997) == \"0b1111100100\"\n    assert candidate(560,851) == \"0b1011000010\"\n    assert candidate(185,546) == \"0b101101110\"\n    assert candidate(362,496) == \"0b110101101\"\n    assert candidate(350,902) == \"0b1001110010\"\n    assert candidate(197,233) == \"0b11010111\"\n\n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate(7, 5) == -1\n    assert candidate(5, 1) == -1\n    assert candidate(5, 5) == \"0b101\"\n\n",
+    "entry_point": "rounded_avg",
+    "code": "def rounded_avg(n, m):\n    if n > m:\n        return -1\n    \n    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)\n    \n    return \"0b\" + bin(rounded_avg)[2:]\n\n# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\"",
+    "blocks": [
+      "def rounded_avg(n, m):\n    if n > m:\n        return -1",
+      "    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)",
+      "    return \"0b\" + bin(rounded_avg)[2:]",
+      "# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\""
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "The code uses integer division for the average, so rounding has no effect and fractional averages are handled incorrectly.",
+      "correction": "    total = sum(range(n, m + 1))\n    avg = total / (m - n + 1)\n    rounded_avg = round(avg)"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"The code uses integer division for the average, so rounding has no effect and fractional averages are handled incorrectly.\",\n  \"correction\": \"    total = sum(range(n, m + 1))\\n    avg = total / (m - n + 1)\\n    rounded_avg = round(avg)\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/141",
+    "sample_idx": 1,
+    "prompt": "\ndef file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(\"example.txt\") == 'Yes'\n    assert candidate(\"1example.dll\") == 'No'\n    assert candidate('s1sdf3.asd') == 'No'\n    assert candidate('K.dll') == 'Yes'\n    assert candidate('MY16FILE3.exe') == 'Yes'\n    assert candidate('His12FILE94.exe') == 'No'\n    assert candidate('_Y.txt') == 'No'\n    assert candidate('?aREYA.exe') == 'No'\n    assert candidate('/this_is_valid.dll') == 'No'\n    assert candidate('this_is_valid.wow') == 'No'\n    assert candidate('this_is_valid.txt') == 'Yes'\n    assert candidate('this_is_valid.txtexe') == 'No'\n    assert candidate('#this2_i4s_5valid.ten') == 'No'\n    assert candidate('@this1_is6_valid.exe') == 'No'\n    assert candidate('this_is_12valid.6exe4.txt') == 'No'\n    assert candidate('all.exe.txt') == 'No'\n    assert candidate('I563_No.exe') == 'Yes'\n    assert candidate('Is3youfault.txt') == 'Yes'\n    assert candidate('no_one#knows.dll') == 'Yes'\n    assert candidate('1I563_Yes3.exe') == 'No'\n    assert candidate('I563_Yes3.txtt') == 'No'\n    assert candidate('final..txt') == 'No'\n    assert candidate('final132') == 'No'\n    assert candidate('_f4indsartal132.') == 'No'\n    \n        \n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate('.txt') == 'No'\n    assert candidate('s.') == 'No'\n\n",
+    "entry_point": "file_name_check",
+    "code": "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'\n    \n    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'\n    \n    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'\n    \n    return 'Yes'",
+    "blocks": [
+      "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'",
+      "    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'",
+      "    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'",
+      "    return 'Yes'"
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "Block 2 fails to ensure that the substring before the dot is non-empty and starts with a letter, allowing names like '.txt' or '1example.txt' to pass the initial check improperly.",
+      "correction": "    # Check for exactly one dot and valid name before dot\n    if file_name.count('.') != 1:\n        return 'No'\n    name_before_dot, dot, ext = file_name.partition('.')\n    if not name_before_dot or not name_before_dot[0].isalpha():\n        return 'No'"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"Block 2 fails to ensure that the substring before the dot is non-empty and starts with a letter, allowing names like '.txt' or '1example.txt' to pass the initial check improperly.\",\n  \"correction\": \"    # Check for exactly one dot and valid name before dot\\n    if file_name.count('.') != 1:\\n        return 'No'\\n    name_before_dot, dot, ext = file_name.partition('.')\\n    if not name_before_dot or not name_before_dot[0].isalpha():\\n        return 'No'\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/103",
+    "sample_idx": 2,
+    "prompt": "\ndef rounded_avg(n, m):\n    \"\"\"You are given two positive integers n and m, and your task is to compute the\n    average of the integers from n through m (including n and m). \n    Round the answer to the nearest integer and convert that to binary.\n    If n is greater than m, return -1.\n    Example:\n    rounded_avg(1, 5) => \"0b11\"\n    rounded_avg(7, 5) => -1\n    rounded_avg(10, 20) => \"0b1111\"\n    rounded_avg(20, 33) => \"0b11010\"\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(1, 5) == \"0b11\"\n    assert candidate(7, 13) == \"0b1010\"\n    assert candidate(964,977) == \"0b1111001010\"\n    assert candidate(996,997) == \"0b1111100100\"\n    assert candidate(560,851) == \"0b1011000010\"\n    assert candidate(185,546) == \"0b101101110\"\n    assert candidate(362,496) == \"0b110101101\"\n    assert candidate(350,902) == \"0b1001110010\"\n    assert candidate(197,233) == \"0b11010111\"\n\n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate(7, 5) == -1\n    assert candidate(5, 1) == -1\n    assert candidate(5, 5) == \"0b101\"\n\n",
+    "entry_point": "rounded_avg",
+    "code": "def rounded_avg(n, m):\n    if n > m:\n        return -1\n    \n    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)\n    \n    return \"0b\" + bin(rounded_avg)[2:]\n\n# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\"",
+    "blocks": [
+      "def rounded_avg(n, m):\n    if n > m:\n        return -1",
+      "    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)",
+      "    return \"0b\" + bin(rounded_avg)[2:]",
+      "# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\""
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "It uses integer division before rounding, so the average is truncated instead of being properly rounded to the nearest integer.",
+      "correction": "    total = sum(range(n, m + 1))\n    avg = total / (m - n + 1)\n    rounded_avg = round(avg)"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"It uses integer division before rounding, so the average is truncated instead of being properly rounded to the nearest integer.\",\n  \"correction\": \"    total = sum(range(n, m + 1))\\n    avg = total / (m - n + 1)\\n    rounded_avg = round(avg)\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/141",
+    "sample_idx": 2,
+    "prompt": "\ndef file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(\"example.txt\") == 'Yes'\n    assert candidate(\"1example.dll\") == 'No'\n    assert candidate('s1sdf3.asd') == 'No'\n    assert candidate('K.dll') == 'Yes'\n    assert candidate('MY16FILE3.exe') == 'Yes'\n    assert candidate('His12FILE94.exe') == 'No'\n    assert candidate('_Y.txt') == 'No'\n    assert candidate('?aREYA.exe') == 'No'\n    assert candidate('/this_is_valid.dll') == 'No'\n    assert candidate('this_is_valid.wow') == 'No'\n    assert candidate('this_is_valid.txt') == 'Yes'\n    assert candidate('this_is_valid.txtexe') == 'No'\n    assert candidate('#this2_i4s_5valid.ten') == 'No'\n    assert candidate('@this1_is6_valid.exe') == 'No'\n    assert candidate('this_is_12valid.6exe4.txt') == 'No'\n    assert candidate('all.exe.txt') == 'No'\n    assert candidate('I563_No.exe') == 'Yes'\n    assert candidate('Is3youfault.txt') == 'Yes'\n    assert candidate('no_one#knows.dll') == 'Yes'\n    assert candidate('1I563_Yes3.exe') == 'No'\n    assert candidate('I563_Yes3.txtt') == 'No'\n    assert candidate('final..txt') == 'No'\n    assert candidate('final132') == 'No'\n    assert candidate('_f4indsartal132.') == 'No'\n    \n        \n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate('.txt') == 'No'\n    assert candidate('s.') == 'No'\n\n",
+    "entry_point": "file_name_check",
+    "code": "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'\n    \n    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'\n    \n    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'\n    \n    return 'Yes'",
+    "blocks": [
+      "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'",
+      "    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'",
+      "    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'",
+      "    return 'Yes'"
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "Block 2 fails to ensure that the substring before the dot is non-empty and starts with a latin alphabet letter; it only checks that the first character is not a digit and does not validate that it is a letter or that the dot is not the first character.",
+      "correction": "    # Check for exactly one dot and non-empty name before dot starting with a letter\n    if file_name.count('.') != 1:\n        return 'No'\n    name, _, ext = file_name.partition('.')\n    if not name or not name[0].isalpha():\n        return 'No'"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"Block 2 fails to ensure that the substring before the dot is non-empty and starts with a latin alphabet letter; it only checks that the first character is not a digit and does not validate that it is a letter or that the dot is not the first character.\",\n  \"correction\": \"    # Check for exactly one dot and non-empty name before dot starting with a letter\\n    if file_name.count('.') != 1:\\n        return 'No'\\n    name, _, ext = file_name.partition('.')\\n    if not name or not name[0].isalpha():\\n        return 'No'\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/103",
+    "sample_idx": 3,
+    "prompt": "\ndef rounded_avg(n, m):\n    \"\"\"You are given two positive integers n and m, and your task is to compute the\n    average of the integers from n through m (including n and m). \n    Round the answer to the nearest integer and convert that to binary.\n    If n is greater than m, return -1.\n    Example:\n    rounded_avg(1, 5) => \"0b11\"\n    rounded_avg(7, 5) => -1\n    rounded_avg(10, 20) => \"0b1111\"\n    rounded_avg(20, 33) => \"0b11010\"\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(1, 5) == \"0b11\"\n    assert candidate(7, 13) == \"0b1010\"\n    assert candidate(964,977) == \"0b1111001010\"\n    assert candidate(996,997) == \"0b1111100100\"\n    assert candidate(560,851) == \"0b1011000010\"\n    assert candidate(185,546) == \"0b101101110\"\n    assert candidate(362,496) == \"0b110101101\"\n    assert candidate(350,902) == \"0b1001110010\"\n    assert candidate(197,233) == \"0b11010111\"\n\n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate(7, 5) == -1\n    assert candidate(5, 1) == -1\n    assert candidate(5, 5) == \"0b101\"\n\n",
+    "entry_point": "rounded_avg",
+    "code": "def rounded_avg(n, m):\n    if n > m:\n        return -1\n    \n    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)\n    \n    return \"0b\" + bin(rounded_avg)[2:]\n\n# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\"",
+    "blocks": [
+      "def rounded_avg(n, m):\n    if n > m:\n        return -1",
+      "    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)",
+      "    return \"0b\" + bin(rounded_avg)[2:]",
+      "# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\""
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "It uses integer floor division before rounding, which can change the value that should be rounded (e.g., 2.5 becomes 2 instead of rounding to 3).",
+      "correction": "    total = sum(range(n, m + 1))\n    avg = total / (m - n + 1)\n    rounded_avg = round(avg)"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"It uses integer floor division before rounding, which can change the value that should be rounded (e.g., 2.5 becomes 2 instead of rounding to 3).\",\n  \"correction\": \"    total = sum(range(n, m + 1))\\n    avg = total / (m - n + 1)\\n    rounded_avg = round(avg)\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/141",
+    "sample_idx": 3,
+    "prompt": "\ndef file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(\"example.txt\") == 'Yes'\n    assert candidate(\"1example.dll\") == 'No'\n    assert candidate('s1sdf3.asd') == 'No'\n    assert candidate('K.dll') == 'Yes'\n    assert candidate('MY16FILE3.exe') == 'Yes'\n    assert candidate('His12FILE94.exe') == 'No'\n    assert candidate('_Y.txt') == 'No'\n    assert candidate('?aREYA.exe') == 'No'\n    assert candidate('/this_is_valid.dll') == 'No'\n    assert candidate('this_is_valid.wow') == 'No'\n    assert candidate('this_is_valid.txt') == 'Yes'\n    assert candidate('this_is_valid.txtexe') == 'No'\n    assert candidate('#this2_i4s_5valid.ten') == 'No'\n    assert candidate('@this1_is6_valid.exe') == 'No'\n    assert candidate('this_is_12valid.6exe4.txt') == 'No'\n    assert candidate('all.exe.txt') == 'No'\n    assert candidate('I563_No.exe') == 'Yes'\n    assert candidate('Is3youfault.txt') == 'Yes'\n    assert candidate('no_one#knows.dll') == 'Yes'\n    assert candidate('1I563_Yes3.exe') == 'No'\n    assert candidate('I563_Yes3.txtt') == 'No'\n    assert candidate('final..txt') == 'No'\n    assert candidate('final132') == 'No'\n    assert candidate('_f4indsartal132.') == 'No'\n    \n        \n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate('.txt') == 'No'\n    assert candidate('s.') == 'No'\n\n",
+    "entry_point": "file_name_check",
+    "code": "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'\n    \n    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'\n    \n    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'\n    \n    return 'Yes'",
+    "blocks": [
+      "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'",
+      "    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'",
+      "    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'",
+      "    return 'Yes'"
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "Block 2 fails to ensure that the substring before the dot is non-empty and starts with a letter, and it allows the dot to appear at the start or end of the filename.",
+      "correction": "    # Check for exactly one dot and non-empty name before dot starting with a letter\n    if file_name.count('.') != 1:\n        return 'No'\n    name, _, ext = file_name.rpartition('.')\n    if not name or not name[0].isalpha():\n        return 'No'"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"Block 2 fails to ensure that the substring before the dot is non-empty and starts with a letter, and it allows the dot to appear at the start or end of the filename.\",\n  \"correction\": \"    # Check for exactly one dot and non-empty name before dot starting with a letter\\n    if file_name.count('.') != 1:\\n        return 'No'\\n    name, _, ext = file_name.rpartition('.')\\n    if not name or not name[0].isalpha():\\n        return 'No'\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/103",
+    "sample_idx": 4,
+    "prompt": "\ndef rounded_avg(n, m):\n    \"\"\"You are given two positive integers n and m, and your task is to compute the\n    average of the integers from n through m (including n and m). \n    Round the answer to the nearest integer and convert that to binary.\n    If n is greater than m, return -1.\n    Example:\n    rounded_avg(1, 5) => \"0b11\"\n    rounded_avg(7, 5) => -1\n    rounded_avg(10, 20) => \"0b1111\"\n    rounded_avg(20, 33) => \"0b11010\"\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(1, 5) == \"0b11\"\n    assert candidate(7, 13) == \"0b1010\"\n    assert candidate(964,977) == \"0b1111001010\"\n    assert candidate(996,997) == \"0b1111100100\"\n    assert candidate(560,851) == \"0b1011000010\"\n    assert candidate(185,546) == \"0b101101110\"\n    assert candidate(362,496) == \"0b110101101\"\n    assert candidate(350,902) == \"0b1001110010\"\n    assert candidate(197,233) == \"0b11010111\"\n\n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate(7, 5) == -1\n    assert candidate(5, 1) == -1\n    assert candidate(5, 5) == \"0b101\"\n\n",
+    "entry_point": "rounded_avg",
+    "code": "def rounded_avg(n, m):\n    if n > m:\n        return -1\n    \n    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)\n    \n    return \"0b\" + bin(rounded_avg)[2:]\n\n# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\"",
+    "blocks": [
+      "def rounded_avg(n, m):\n    if n > m:\n        return -1",
+      "    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)",
+      "    return \"0b\" + bin(rounded_avg)[2:]",
+      "# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\""
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "It computes the average using integer floor division instead of true division, so rounding is not performed on the correct (possibly fractional) average.",
+      "correction": "    total = sum(range(n, m + 1))\n    avg = total / (m - n + 1)\n    rounded_avg = round(avg)"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"It computes the average using integer floor division instead of true division, so rounding is not performed on the correct (possibly fractional) average.\",\n  \"correction\": \"    total = sum(range(n, m + 1))\\n    avg = total / (m - n + 1)\\n    rounded_avg = round(avg)\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/141",
+    "sample_idx": 4,
+    "prompt": "\ndef file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(\"example.txt\") == 'Yes'\n    assert candidate(\"1example.dll\") == 'No'\n    assert candidate('s1sdf3.asd') == 'No'\n    assert candidate('K.dll') == 'Yes'\n    assert candidate('MY16FILE3.exe') == 'Yes'\n    assert candidate('His12FILE94.exe') == 'No'\n    assert candidate('_Y.txt') == 'No'\n    assert candidate('?aREYA.exe') == 'No'\n    assert candidate('/this_is_valid.dll') == 'No'\n    assert candidate('this_is_valid.wow') == 'No'\n    assert candidate('this_is_valid.txt') == 'Yes'\n    assert candidate('this_is_valid.txtexe') == 'No'\n    assert candidate('#this2_i4s_5valid.ten') == 'No'\n    assert candidate('@this1_is6_valid.exe') == 'No'\n    assert candidate('this_is_12valid.6exe4.txt') == 'No'\n    assert candidate('all.exe.txt') == 'No'\n    assert candidate('I563_No.exe') == 'Yes'\n    assert candidate('Is3youfault.txt') == 'Yes'\n    assert candidate('no_one#knows.dll') == 'Yes'\n    assert candidate('1I563_Yes3.exe') == 'No'\n    assert candidate('I563_Yes3.txtt') == 'No'\n    assert candidate('final..txt') == 'No'\n    assert candidate('final132') == 'No'\n    assert candidate('_f4indsartal132.') == 'No'\n    \n        \n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate('.txt') == 'No'\n    assert candidate('s.') == 'No'\n\n",
+    "entry_point": "file_name_check",
+    "code": "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'\n    \n    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'\n    \n    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'\n    \n    return 'Yes'",
+    "blocks": [
+      "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'",
+      "    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'",
+      "    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'",
+      "    return 'Yes'"
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "Block 2 fails to ensure that the substring before the dot is non-empty and starts with a letter, since it only checks that the first character is not a digit.",
+      "correction": "    # Check for exactly one dot and non-empty name before dot starting with a letter\n    if file_name.count('.') != 1:\n        return 'No'\n    before_dot, sep, after_dot = file_name.partition('.')\n    if not before_dot or not before_dot[0].isalpha():\n        return 'No'"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"Block 2 fails to ensure that the substring before the dot is non-empty and starts with a letter, since it only checks that the first character is not a digit.\",\n  \"correction\": \"    # Check for exactly one dot and non-empty name before dot starting with a letter\\n    if file_name.count('.') != 1:\\n        return 'No'\\n    before_dot, sep, after_dot = file_name.partition('.')\\n    if not before_dot or not before_dot[0].isalpha():\\n        return 'No'\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/103",
+    "sample_idx": 5,
+    "prompt": "\ndef rounded_avg(n, m):\n    \"\"\"You are given two positive integers n and m, and your task is to compute the\n    average of the integers from n through m (including n and m). \n    Round the answer to the nearest integer and convert that to binary.\n    If n is greater than m, return -1.\n    Example:\n    rounded_avg(1, 5) => \"0b11\"\n    rounded_avg(7, 5) => -1\n    rounded_avg(10, 20) => \"0b1111\"\n    rounded_avg(20, 33) => \"0b11010\"\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(1, 5) == \"0b11\"\n    assert candidate(7, 13) == \"0b1010\"\n    assert candidate(964,977) == \"0b1111001010\"\n    assert candidate(996,997) == \"0b1111100100\"\n    assert candidate(560,851) == \"0b1011000010\"\n    assert candidate(185,546) == \"0b101101110\"\n    assert candidate(362,496) == \"0b110101101\"\n    assert candidate(350,902) == \"0b1001110010\"\n    assert candidate(197,233) == \"0b11010111\"\n\n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate(7, 5) == -1\n    assert candidate(5, 1) == -1\n    assert candidate(5, 5) == \"0b101\"\n\n",
+    "entry_point": "rounded_avg",
+    "code": "def rounded_avg(n, m):\n    if n > m:\n        return -1\n    \n    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)\n    \n    return \"0b\" + bin(rounded_avg)[2:]\n\n# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\"",
+    "blocks": [
+      "def rounded_avg(n, m):\n    if n > m:\n        return -1",
+      "    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)",
+      "    return \"0b\" + bin(rounded_avg)[2:]",
+      "# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\""
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "Block 2 incorrectly computes the average using integer division (//) before rounding, which prevents correct rounding for non-integer averages.",
+      "correction": "    total = sum(range(n, m + 1))\n    avg = total / (m - n + 1)\n    rounded_avg = round(avg)"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"Block 2 incorrectly computes the average using integer division (//) before rounding, which prevents correct rounding for non-integer averages.\",\n  \"correction\": \"    total = sum(range(n, m + 1))\\n    avg = total / (m - n + 1)\\n    rounded_avg = round(avg)\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/141",
+    "sample_idx": 5,
+    "prompt": "\ndef file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(\"example.txt\") == 'Yes'\n    assert candidate(\"1example.dll\") == 'No'\n    assert candidate('s1sdf3.asd') == 'No'\n    assert candidate('K.dll') == 'Yes'\n    assert candidate('MY16FILE3.exe') == 'Yes'\n    assert candidate('His12FILE94.exe') == 'No'\n    assert candidate('_Y.txt') == 'No'\n    assert candidate('?aREYA.exe') == 'No'\n    assert candidate('/this_is_valid.dll') == 'No'\n    assert candidate('this_is_valid.wow') == 'No'\n    assert candidate('this_is_valid.txt') == 'Yes'\n    assert candidate('this_is_valid.txtexe') == 'No'\n    assert candidate('#this2_i4s_5valid.ten') == 'No'\n    assert candidate('@this1_is6_valid.exe') == 'No'\n    assert candidate('this_is_12valid.6exe4.txt') == 'No'\n    assert candidate('all.exe.txt') == 'No'\n    assert candidate('I563_No.exe') == 'Yes'\n    assert candidate('Is3youfault.txt') == 'Yes'\n    assert candidate('no_one#knows.dll') == 'Yes'\n    assert candidate('1I563_Yes3.exe') == 'No'\n    assert candidate('I563_Yes3.txtt') == 'No'\n    assert candidate('final..txt') == 'No'\n    assert candidate('final132') == 'No'\n    assert candidate('_f4indsartal132.') == 'No'\n    \n        \n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate('.txt') == 'No'\n    assert candidate('s.') == 'No'\n\n",
+    "entry_point": "file_name_check",
+    "code": "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'\n    \n    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'\n    \n    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'\n    \n    return 'Yes'",
+    "blocks": [
+      "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'",
+      "    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'",
+      "    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'",
+      "    return 'Yes'"
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "Block 2 fails to reject filenames where the substring before the dot is empty (e.g., '.txt') and does not verify that the first character before the dot is a letter.",
+      "correction": "    # Check for exactly one dot and non-empty name before dot that starts with a letter\n    if file_name.count('.') != 1:\n        return 'No'\n    name_part, _, ext_part = file_name.partition('.')\n    if not name_part or not name_part[0].isalpha():\n        return 'No'"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"Block 2 fails to reject filenames where the substring before the dot is empty (e.g., '.txt') and does not verify that the first character before the dot is a letter.\",\n  \"correction\": \"    # Check for exactly one dot and non-empty name before dot that starts with a letter\\n    if file_name.count('.') != 1:\\n        return 'No'\\n    name_part, _, ext_part = file_name.partition('.')\\n    if not name_part or not name_part[0].isalpha():\\n        return 'No'\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/103",
+    "sample_idx": 6,
+    "prompt": "\ndef rounded_avg(n, m):\n    \"\"\"You are given two positive integers n and m, and your task is to compute the\n    average of the integers from n through m (including n and m). \n    Round the answer to the nearest integer and convert that to binary.\n    If n is greater than m, return -1.\n    Example:\n    rounded_avg(1, 5) => \"0b11\"\n    rounded_avg(7, 5) => -1\n    rounded_avg(10, 20) => \"0b1111\"\n    rounded_avg(20, 33) => \"0b11010\"\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(1, 5) == \"0b11\"\n    assert candidate(7, 13) == \"0b1010\"\n    assert candidate(964,977) == \"0b1111001010\"\n    assert candidate(996,997) == \"0b1111100100\"\n    assert candidate(560,851) == \"0b1011000010\"\n    assert candidate(185,546) == \"0b101101110\"\n    assert candidate(362,496) == \"0b110101101\"\n    assert candidate(350,902) == \"0b1001110010\"\n    assert candidate(197,233) == \"0b11010111\"\n\n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate(7, 5) == -1\n    assert candidate(5, 1) == -1\n    assert candidate(5, 5) == \"0b101\"\n\n",
+    "entry_point": "rounded_avg",
+    "code": "def rounded_avg(n, m):\n    if n > m:\n        return -1\n    \n    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)\n    \n    return \"0b\" + bin(rounded_avg)[2:]\n\n# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\"",
+    "blocks": [
+      "def rounded_avg(n, m):\n    if n > m:\n        return -1",
+      "    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)",
+      "    return \"0b\" + bin(rounded_avg)[2:]",
+      "# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\""
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "Block 2 uses integer division instead of true division, so the average is truncated instead of computed precisely before rounding.",
+      "correction": "    total = sum(range(n, m + 1))\n    avg = total / (m - n + 1)\n    rounded_avg = round(avg)"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"Block 2 uses integer division instead of true division, so the average is truncated instead of computed precisely before rounding.\",\n  \"correction\": \"    total = sum(range(n, m + 1))\\n    avg = total / (m - n + 1)\\n    rounded_avg = round(avg)\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/141",
+    "sample_idx": 6,
+    "prompt": "\ndef file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(\"example.txt\") == 'Yes'\n    assert candidate(\"1example.dll\") == 'No'\n    assert candidate('s1sdf3.asd') == 'No'\n    assert candidate('K.dll') == 'Yes'\n    assert candidate('MY16FILE3.exe') == 'Yes'\n    assert candidate('His12FILE94.exe') == 'No'\n    assert candidate('_Y.txt') == 'No'\n    assert candidate('?aREYA.exe') == 'No'\n    assert candidate('/this_is_valid.dll') == 'No'\n    assert candidate('this_is_valid.wow') == 'No'\n    assert candidate('this_is_valid.txt') == 'Yes'\n    assert candidate('this_is_valid.txtexe') == 'No'\n    assert candidate('#this2_i4s_5valid.ten') == 'No'\n    assert candidate('@this1_is6_valid.exe') == 'No'\n    assert candidate('this_is_12valid.6exe4.txt') == 'No'\n    assert candidate('all.exe.txt') == 'No'\n    assert candidate('I563_No.exe') == 'Yes'\n    assert candidate('Is3youfault.txt') == 'Yes'\n    assert candidate('no_one#knows.dll') == 'Yes'\n    assert candidate('1I563_Yes3.exe') == 'No'\n    assert candidate('I563_Yes3.txtt') == 'No'\n    assert candidate('final..txt') == 'No'\n    assert candidate('final132') == 'No'\n    assert candidate('_f4indsartal132.') == 'No'\n    \n        \n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate('.txt') == 'No'\n    assert candidate('s.') == 'No'\n\n",
+    "entry_point": "file_name_check",
+    "code": "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'\n    \n    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'\n    \n    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'\n    \n    return 'Yes'",
+    "blocks": [
+      "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'",
+      "    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'",
+      "    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'",
+      "    return 'Yes'"
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "Block 2 only checks that the very first character is not a digit, but it must ensure the substring before the dot is non-empty and starts with a Latin letter.",
+      "correction": "    # Check for exactly one dot and non-empty name before dot starting with a letter\n    if file_name.count('.') != 1:\n        return 'No'\n    name_before_dot = file_name.split('.')[0]\n    if not name_before_dot or not name_before_dot[0].isalpha():\n        return 'No'"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"Block 2 only checks that the very first character is not a digit, but it must ensure the substring before the dot is non-empty and starts with a Latin letter.\",\n  \"correction\": \"    # Check for exactly one dot and non-empty name before dot starting with a letter\\n    if file_name.count('.') != 1:\\n        return 'No'\\n    name_before_dot = file_name.split('.')[0]\\n    if not name_before_dot or not name_before_dot[0].isalpha():\\n        return 'No'\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/103",
+    "sample_idx": 7,
+    "prompt": "\ndef rounded_avg(n, m):\n    \"\"\"You are given two positive integers n and m, and your task is to compute the\n    average of the integers from n through m (including n and m). \n    Round the answer to the nearest integer and convert that to binary.\n    If n is greater than m, return -1.\n    Example:\n    rounded_avg(1, 5) => \"0b11\"\n    rounded_avg(7, 5) => -1\n    rounded_avg(10, 20) => \"0b1111\"\n    rounded_avg(20, 33) => \"0b11010\"\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(1, 5) == \"0b11\"\n    assert candidate(7, 13) == \"0b1010\"\n    assert candidate(964,977) == \"0b1111001010\"\n    assert candidate(996,997) == \"0b1111100100\"\n    assert candidate(560,851) == \"0b1011000010\"\n    assert candidate(185,546) == \"0b101101110\"\n    assert candidate(362,496) == \"0b110101101\"\n    assert candidate(350,902) == \"0b1001110010\"\n    assert candidate(197,233) == \"0b11010111\"\n\n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate(7, 5) == -1\n    assert candidate(5, 1) == -1\n    assert candidate(5, 5) == \"0b101\"\n\n",
+    "entry_point": "rounded_avg",
+    "code": "def rounded_avg(n, m):\n    if n > m:\n        return -1\n    \n    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)\n    \n    return \"0b\" + bin(rounded_avg)[2:]\n\n# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\"",
+    "blocks": [
+      "def rounded_avg(n, m):\n    if n > m:\n        return -1",
+      "    total = sum(range(n, m + 1))\n    avg = total // (m - n + 1)\n    rounded_avg = round(avg)",
+      "    return \"0b\" + bin(rounded_avg)[2:]",
+      "# Testing the examples\nprint(rounded_avg(1, 5))  # Output: \"0b11\"\nprint(rounded_avg(7, 5))  # Output: -1\nprint(rounded_avg(10, 20))  # Output: \"0b1111\"\nprint(rounded_avg(20, 33))  # Output: \"0b11010\""
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "It computes an integer truncated average using floor division instead of the true arithmetic mean before rounding.",
+      "correction": "    total = sum(range(n, m + 1))\n    avg = total / (m - n + 1)\n    rounded_avg = round(avg)"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"It computes an integer truncated average using floor division instead of the true arithmetic mean before rounding.\",\n  \"correction\": \"    total = sum(range(n, m + 1))\\n    avg = total / (m - n + 1)\\n    rounded_avg = round(avg)\"\n}",
+    "bucket": "early"
+  },
+  {
+    "doc_id": "HumanEval/141",
+    "sample_idx": 7,
+    "prompt": "\ndef file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n",
+    "test": "def check(candidate):\n\n    # Check some simple cases\n    assert candidate(\"example.txt\") == 'Yes'\n    assert candidate(\"1example.dll\") == 'No'\n    assert candidate('s1sdf3.asd') == 'No'\n    assert candidate('K.dll') == 'Yes'\n    assert candidate('MY16FILE3.exe') == 'Yes'\n    assert candidate('His12FILE94.exe') == 'No'\n    assert candidate('_Y.txt') == 'No'\n    assert candidate('?aREYA.exe') == 'No'\n    assert candidate('/this_is_valid.dll') == 'No'\n    assert candidate('this_is_valid.wow') == 'No'\n    assert candidate('this_is_valid.txt') == 'Yes'\n    assert candidate('this_is_valid.txtexe') == 'No'\n    assert candidate('#this2_i4s_5valid.ten') == 'No'\n    assert candidate('@this1_is6_valid.exe') == 'No'\n    assert candidate('this_is_12valid.6exe4.txt') == 'No'\n    assert candidate('all.exe.txt') == 'No'\n    assert candidate('I563_No.exe') == 'Yes'\n    assert candidate('Is3youfault.txt') == 'Yes'\n    assert candidate('no_one#knows.dll') == 'Yes'\n    assert candidate('1I563_Yes3.exe') == 'No'\n    assert candidate('I563_Yes3.txtt') == 'No'\n    assert candidate('final..txt') == 'No'\n    assert candidate('final132') == 'No'\n    assert candidate('_f4indsartal132.') == 'No'\n    \n        \n\n    # Check some edge cases that are easy to work out by hand.\n    assert candidate('.txt') == 'No'\n    assert candidate('s.') == 'No'\n\n",
+    "entry_point": "file_name_check",
+    "code": "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'\n    \n    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'\n    \n    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'\n    \n    return 'Yes'",
+    "blocks": [
+      "def file_name_check(file_name):\n    \"\"\"Create a function which takes a string representing a file's name, and returns\n    'Yes' if the the file's name is valid, and returns 'No' otherwise.\n    A file's name is considered to be valid if and only if all the following conditions \n    are met:\n    - There should not be more than three digits ('0'-'9') in the file's name.\n    - The file's name contains exactly one dot '.'\n    - The substring before the dot should not be empty, and it starts with a letter from \n    the latin alphapet ('a'-'z' and 'A'-'Z').\n    - The substring after the dot should be one of these: ['txt', 'exe', 'dll']\n    Examples:\n    file_name_check(\"example.txt\") # => 'Yes'\n    file_name_check(\"1example.dll\") # => 'No' (the name should start with a latin alphapet letter)\n    \"\"\"\n    # Check for more than three digits\n    if file_name.count('0') + file_name.count('1') + file_name.count('2') + file_name.count('3') + file_name.count('4') + file_name.count('5') + file_name.count('6') + file_name.count('7') + file_name.count('8') + file_name.count('9') > 3:\n        return 'No'",
+      "    # Check for exactly one dot and non-empty name before dot\n    if file_name.count('.') != 1 or file_name[0].isdigit():\n        return 'No'",
+      "    # Check if the name after the dot is valid\n    valid_extensions = ['txt', 'exe', 'dll']\n    if file_name.rpartition('.')[2] not in valid_extensions:\n        return 'No'",
+      "    return 'Yes'"
+    ],
+    "n_blocks": 4,
+    "tau": 2,
+    "gpt_parsed": {
+      "first_error_block": 2,
+      "total_blocks": 4,
+      "reason": "Block 2 fails to ensure that the substring before the dot is non-empty and that the first character before the dot is a letter, and instead only checks that the very first character of the whole string is not a digit.",
+      "correction": "    # Check for exactly one dot and non-empty name before dot starting with a letter\n    if file_name.count('.') != 1:\n        return 'No'\n    name, dot, ext = file_name.partition('.')\n    if not name or not name[0].isalpha():\n        return 'No'"
+    },
+    "gpt_raw": "{\n  \"first_error_block\": 2,\n  \"total_blocks\": 4,\n  \"reason\": \"Block 2 fails to ensure that the substring before the dot is non-empty and that the first character before the dot is a letter, and instead only checks that the very first character of the whole string is not a digit.\",\n  \"correction\": \"    # Check for exactly one dot and non-empty name before dot starting with a letter\\n    if file_name.count('.') != 1:\\n        return 'No'\\n    name, dot, ext = file_name.partition('.')\\n    if not name or not name[0].isalpha():\\n        return 'No'\"\n}",
+    "bucket": "early"
+  }
+]

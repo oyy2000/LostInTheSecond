@@ -151,3 +151,131 @@ def make_client() -> OpenAI:
     if os.environ.get("BASE_URL"):
         kwargs["base_url"] = os.environ["BASE_URL"]
     return OpenAI(**kwargs)
+
+
+# ── All-errors prompt (cascade detection) ────────────────────────────────
+
+def build_all_errors_prompt(
+    question: str,
+    gold_answer: str,
+    steps: List[str],
+) -> str:
+    """Prompt GPT to find ALL incorrect steps and flag cascade relationships."""
+    numbered = "\n".join(f"[{i+1}] {s}" for i, s in enumerate(steps))
+    return f"""You are a rigorous math reasoning verifier.
+
+Question:
+{question}
+
+Correct final answer: {gold_answer}
+
+The model produced the following step-by-step solution (which arrives at a WRONG final answer):
+
+{numbered}
+
+Judgment criteria (follow strictly):
+- For each step, check whether the arithmetic is performed correctly on the
+  numbers it uses.
+- A step is CORRECT if its arithmetic is right AND the numbers come from the
+  problem or a preceding step's result.
+- A step is INCORRECT if it computes an arithmetic operation wrong OR applies
+  a formula to a wrong base number.
+- A step that merely propagates an earlier wrong result (uses the wrong number
+  from a previous incorrect step but applies correct arithmetic to it) is a
+  CASCADE error, not an independent error.
+
+Task:
+1. Walk through every step. For each, decide correct / incorrect / cascade.
+2. Report ALL incorrect steps (not just the first).
+3. For each incorrect step, state whether it is "independent" (a new mistake)
+   or "cascade" (correct arithmetic applied to a previously wrong value).
+4. For each incorrect step, propose a MINIMAL correction.
+
+Output STRICT JSON (no markdown fences):
+{{
+  "total_steps": {len(steps)},
+  "errors": [
+    {{
+      "step": <int, 1-indexed>,
+      "type": "independent" or "cascade",
+      "cascade_from": <int step number that caused this cascade, or null>,
+      "reason": "<one sentence>",
+      "correction": "<corrected step content, no [N] prefix>"
+    }}
+  ]
+}}
+
+If only one step is incorrect, the list has one entry.
+If ALL steps are correct (rare), return:
+{{
+  "total_steps": {len(steps)},
+  "errors": []
+}}"""
+
+
+def call_gpt_all_errors(
+    client: OpenAI,
+    model: str,
+    prompt: str,
+    temperature: float = 0.0,
+    max_output_tokens: int = 1500,
+    retries: int = 5,
+    sleep_base: float = 1.0,
+) -> Tuple[Optional[Dict], str]:
+    """Call GPT to get all errors. Same retry logic as call_gpt_first_error."""
+    return call_gpt_first_error(
+        client, model, prompt, temperature, max_output_tokens, retries, sleep_base
+    )
+
+
+# ── CommonsenseQA first-error prompt ─────────────────────────────────────
+
+def build_first_error_prompt_commonsense(
+    question: str,
+    choices_text: str,
+    gold_letter: str,
+    steps: List[str],
+) -> str:
+    """Build a GPT prompt to locate the first reasoning error in a
+    wrong CommonsenseQA chain-of-thought."""
+    numbered = "\n".join(f"[{i+1}] {s}" for i, s in enumerate(steps))
+    return f"""You are a rigorous commonsense reasoning verifier.
+
+Question:
+{question}
+
+Answer choices:
+{choices_text}
+
+Correct answer: {gold_letter}
+
+The model produced the following step-by-step reasoning (which arrives at a WRONG final answer):
+
+{numbered}
+
+Judgment criteria (follow strictly):
+- For each step, check whether the reasoning is logically valid, factually
+  accurate, and relevant to the question.
+- A step is CORRECT if: (a) it makes a factually true claim, AND (b) the
+  logical inference from prior steps is valid, AND (c) it is relevant to
+  answering the question.
+- A step is INCORRECT if it: makes a factually wrong claim, draws an invalid
+  logical inference, introduces irrelevant reasoning that leads away from the
+  correct answer, or misinterprets the question or answer choices.
+- Identify the FIRST step that is incorrect.
+
+Return EXACTLY this JSON (no markdown, no extra text):
+{{
+  "first_error_step": <int, 1-indexed>,
+  "total_steps": {len(steps)},
+  "reason": "<one-sentence explanation of the error>",
+  "correction": "<corrected version of ONLY that step>"
+}}
+
+If ALL steps are actually correct (rare), return:
+{{
+  "first_error_step": -1,
+  "total_steps": {len(steps)},
+  "reason": "all steps correct",
+  "correction": ""
+}}"""
