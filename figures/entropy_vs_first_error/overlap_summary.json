@@ -1,0 +1,16 @@
+{
+  "n_wrong_drafts": 133,
+  "n_valid_pairs": 133,
+  "exact_match": 14,
+  "exact_match_rate": 0.10526315789473684,
+  "within_1_rate": 0.3082706766917293,
+  "random_baseline_exact": 0.20043913897297355,
+  "fe_entropy_rank_mean": 2.56140350877193,
+  "fe_entropy_rank_median": 2.0,
+  "fe_top1_rate": 0.12280701754385964,
+  "fe_top2_rate": 0.30701754385964913,
+  "fe_top3_rate": 0.5350877192982456,
+  "entropy_at_fe": 0.08553920175438597,
+  "entropy_at_other": 0.08326828617363344,
+  "ttest_p": 0.6674832981576921
+}

@@ -1,0 +1,50 @@
+# Base config template for Qwen2.5-3B-Instruct LoRA SFT on GSM8K corrected data.
+# Compatible with LlamaFactory v0.9.2 (installed from LEMMA/LLaMA-Factory).
+# Placeholders: {dataset}, {lr}, {rank}, {lora_alpha}, {epochs}, {output_dir}, {dataset_dir}
+
+### model
+model_name_or_path: Qwen/Qwen2.5-3B-Instruct
+trust_remote_code: true
+
+### method
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_rank: {rank}
+lora_alpha: {lora_alpha}
+lora_target: all
+lora_dropout: 0.05
+
+### dataset
+dataset: {dataset}
+dataset_dir: {dataset_dir}
+template: qwen
+cutoff_len: 2048
+preprocessing_num_workers: 16
+dataloader_num_workers: 4
+
+### output
+output_dir: {output_dir}
+logging_steps: 10
+save_steps: 500
+save_total_limit: 2
+plot_loss: true
+overwrite_output_dir: true
+save_only_model: true
+report_to: none
+
+### train
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 8
+learning_rate: {lr}
+num_train_epochs: {epochs}.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+bf16: true
+ddp_timeout: 180000000
+
+### eval
+val_size: 0.05
+per_device_eval_batch_size: 2
+eval_strategy: steps
+eval_steps: 200

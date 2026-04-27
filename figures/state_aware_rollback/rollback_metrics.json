@@ -1,0 +1,47 @@
+{
+  "Fixed(a=0.4)": {
+    "mean_dist": 1.258,
+    "median_dist": 1.0,
+    "std_dist": 1.034,
+    "prec@1": 0.6515,
+    "prec@2": 0.8864,
+    "prec@3": 0.9697,
+    "n": 528
+  },
+  "Fixed(a=0.6)": {
+    "mean_dist": 1.947,
+    "median_dist": 1.0,
+    "std_dist": 1.62,
+    "prec@1": 0.5303,
+    "prec@2": 0.6894,
+    "prec@3": 0.8106,
+    "n": 528
+  },
+  "Fixed(a=0.8)": {
+    "mean_dist": 2.879,
+    "median_dist": 2.0,
+    "std_dist": 2.377,
+    "prec@1": 0.3409,
+    "prec@2": 0.5303,
+    "prec@3": 0.6742,
+    "n": 528
+  },
+  "Entropy": {
+    "mean_dist": 2.152,
+    "median_dist": 2.0,
+    "std_dist": 2.285,
+    "prec@1": 0.4848,
+    "prec@2": 0.7045,
+    "prec@3": 0.8106,
+    "n": 528
+  },
+  "Probe": {
+    "mean_dist": 2.735,
+    "median_dist": 2.0,
+    "std_dist": 2.625,
+    "prec@1": 0.3864,
+    "prec@2": 0.5606,
+    "prec@3": 0.7197,
+    "n": 528
+  }
+}

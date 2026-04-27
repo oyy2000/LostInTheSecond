@@ -1,0 +1,13 @@
+==========================================
+Full SFT Sweep - Sun Apr 12 01:52:33 AM EDT 2026
+==========================================
+
+=== Environment ===
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import torch; print('torch:', torch.__version__, 'cuda:', torch.cuda.is_available(), 'bf16:', torch.cuda.is_bf16_supported())
+    ^^^^^^^^^^^^
+  File "/common/users/sl2148/anaconda3/lib/python3.13/site-packages/torch/__init__.py", line 442, in <module>
+    from torch._C import *  # noqa: F403
+    ^^^^^^^^^^^^^^^^^^^^^^
+ImportError: /common/users/sl2148/anaconda3/lib/python3.13/site-packages/torch/lib/libtorch_cuda.so: undefined symbol: ncclCommWindowDeregister

@@ -1,0 +1,24 @@
+{
+  "Qwen 2.5 3B / GSM8K": {
+    "n_wrong": 1359,
+    "mean_tau": 4.075055187637969,
+    "median_tau": 4.0,
+    "mean_rel_pos": 0.5378293818237537,
+    "median_rel_pos": 0.5,
+    "mean_n_steps": 7.710816777041942,
+    "frac_first_half": 0.5025754231052244,
+    "frac_first_third": 0.23252391464311994,
+    "single_independent_error_frac": 0.8555555555555555,
+    "two_or_fewer_independent_frac": 0.9583333333333334
+  },
+  "Qwen 2.5 3B / MATH500": {
+    "n_wrong": 5111,
+    "mean_tau": 5.552338094306398,
+    "median_tau": 4.0,
+    "mean_rel_pos": 0.5023047291426864,
+    "median_rel_pos": 0.5,
+    "mean_n_steps": 11.248288006261006,
+    "frac_first_half": 0.5662297006456662,
+    "frac_first_third": 0.3136372529837605
+  }
+}

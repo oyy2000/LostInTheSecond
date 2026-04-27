@@ -1,0 +1,161 @@
+==========================================
+SFT Sweep Runner - Sun Apr 12 12:40:33 AM EDT 2026
+==========================================
+
+=== 1. Environment Check ===
+Python 3.13.12
+LlamaFactory version: 0.9.5.dev0
+/common/users/sl2148/anaconda3/bin/llamafactory-cli
+llamafactory-cli found
+0, Quadro RTX 6000, 1 MiB, 23040 MiB
+1, Quadro RTX 6000, 1 MiB, 23040 MiB
+2, Quadro RTX 6000, 1 MiB, 23040 MiB
+3, Quadro RTX 6000, 1 MiB, 23040 MiB
+4, Quadro RTX 6000, 1 MiB, 23040 MiB
+5, Quadro RTX 6000, 1 MiB, 23040 MiB
+6, Quadro RTX 6000, 1 MiB, 23040 MiB
+7, Quadro RTX 6000, 1 MiB, 23040 MiB
+
+=== 2. Data Check ===
+total 12156
+drwxr-x--- 2 sl2148 sl2148        4 Apr 11 23:59 .
+drwxr-x--- 4 sl2148 sl2148       26 Apr 11 23:59 ..
+-rw-r----- 1 sl2148 sl2148 15380532 Apr 11 23:59 sft_normal.json
+-rw-r----- 1 sl2148 sl2148 18370418 Apr 11 23:59 sft_weighted.json
+  165530 LlamaFactory/data/sft_gsm8k_3b/sft_normal.json
+  199598 LlamaFactory/data/sft_gsm8k_3b/sft_weighted.json
+  365128 total
+
+=== 3. Generate Sweep Configs (dry run) ===
+Generated 24 sweep configs in /common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated
+  normal_lr1e-6_r4_ep5
+  normal_lr1e-6_r4_ep10
+  normal_lr1e-6_r16_ep5
+  normal_lr1e-6_r16_ep10
+  normal_lr5e-6_r4_ep5
+  normal_lr5e-6_r4_ep10
+  normal_lr5e-6_r16_ep5
+  normal_lr5e-6_r16_ep10
+  normal_lr1e-5_r4_ep5
+  normal_lr1e-5_r4_ep10
+  normal_lr1e-5_r16_ep5
+  normal_lr1e-5_r16_ep10
+  weighted_lr1e-6_r4_ep5
+  weighted_lr1e-6_r4_ep10
+  weighted_lr1e-6_r16_ep5
+  weighted_lr1e-6_r16_ep10
+  weighted_lr5e-6_r4_ep5
+  weighted_lr5e-6_r4_ep10
+  weighted_lr5e-6_r16_ep5
+  weighted_lr5e-6_r16_ep10
+  weighted_lr1e-5_r4_ep5
+  weighted_lr1e-5_r4_ep10
+  weighted_lr1e-5_r16_ep5
+  weighted_lr1e-5_r16_ep10
+
+Dry run complete. Use without --dry-run to start training.
+
+=== 4. Starting First Training Run ===
+Running: normal_lr1e-5_r16_ep5 (smallest reasonable config first)
+Generated 24 sweep configs in /common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated
+  normal_lr1e-6_r4_ep5
+  normal_lr1e-6_r4_ep10
+  normal_lr1e-6_r16_ep5
+  normal_lr1e-6_r16_ep10
+  normal_lr5e-6_r4_ep5
+  normal_lr5e-6_r4_ep10
+  normal_lr5e-6_r16_ep5
+  normal_lr5e-6_r16_ep10
+  normal_lr1e-5_r4_ep5
+  normal_lr1e-5_r4_ep10
+  normal_lr1e-5_r16_ep5
+  normal_lr1e-5_r16_ep10
+  weighted_lr1e-6_r4_ep5
+  weighted_lr1e-6_r4_ep10
+  weighted_lr1e-6_r16_ep5
+  weighted_lr1e-6_r16_ep10
+  weighted_lr5e-6_r4_ep5
+  weighted_lr5e-6_r4_ep10
+  weighted_lr5e-6_r16_ep5
+  weighted_lr5e-6_r16_ep10
+  weighted_lr1e-5_r4_ep5
+  weighted_lr1e-5_r4_ep10
+  weighted_lr1e-5_r16_ep5
+  weighted_lr1e-5_r16_ep10
+
+Dry run complete. Use without --dry-run to start training.
+Config found: /common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/configs/sft_sweep/generated/normal_lr1e-5_r16_ep5.yaml
+model_name_or_path: Qwen/Qwen2.5-3B-Instruct
+trust_remote_code: true
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_rank: 16
+lora_target: all
+lora_alpha: 32
+dataset: gsm8k_sft_normal
+template: qwen
+cutoff_len: 2048
+preprocessing_num_workers: 16
+dataloader_num_workers: 4
+output_dir: /common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/saves/qwen25-3b/lora/normal_lr1e-5_r16_ep5
+logging_steps: 10
+save_steps: 500
+save_total_limit: 2
+plot_loss: true
+overwrite_output_dir: true
+save_only_model: true
+report_to: none
+per_device_train_batch_size: 4
+gradient_accumulation_steps: 4
+learning_rate: 1.0e-05
+num_train_epochs: 5.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+bf16: true
+ddp_timeout: 180000000
+val_size: 0.05
+per_device_eval_batch_size: 4
+eval_strategy: steps
+eval_steps: 200
+
+Starting training at Sun Apr 12 12:40:34 AM EDT 2026...
+/common/users/sl2148/anaconda3/lib/python3.13/site-packages/torch/cuda/__init__.py:180: UserWarning: CUDA initialization: The NVIDIA driver on your system is too old (found version 12020). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver. (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:119.)
+  return torch._C._cuda_getDeviceCount() > 0
+warmup_ratio is deprecated and will be removed in v5.2. Use `warmup_steps` instead.
+Traceback (most recent call last):
+  File "/common/users/sl2148/anaconda3/bin/llamafactory-cli", line 6, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/LlamaFactory/src/llamafactory/cli.py", line 24, in main
+    launcher.launch()
+    ~~~~~~~~~~~~~~~^^
+  File "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/LlamaFactory/src/llamafactory/launcher.py", line 157, in launch
+    run_exp()
+    ~~~~~~~^^
+  File "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/LlamaFactory/src/llamafactory/train/tuner.py", line 139, in run_exp
+    _training_function(config={"args": args, "callbacks": callbacks})
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/LlamaFactory/src/llamafactory/train/tuner.py", line 65, in _training_function
+    model_args, data_args, training_args, finetuning_args, generating_args = get_train_args(args)
+                                                                             ~~~~~~~~~~~~~~^^^^^^
+  File "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/LlamaFactory/src/llamafactory/hparams/parser.py", line 290, in get_train_args
+    model_args, data_args, training_args, finetuning_args, generating_args = _parse_train_args(args)
+                                                                             ~~~~~~~~~~~~~~~~~^^^^^^
+  File "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/LlamaFactory/src/llamafactory/hparams/parser.py", line 244, in _parse_train_args
+    return _parse_args(parser, args, allow_extra_keys=allow_extra_keys)
+  File "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/LlamaFactory/src/llamafactory/hparams/parser.py", line 91, in _parse_args
+    return parser.parse_dict(args, allow_extra_keys=allow_extra_keys)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/common/users/sl2148/anaconda3/lib/python3.13/site-packages/transformers/hf_argparser.py", line 380, in parse_dict
+    obj = dtype(**inputs)
+  File "<string>", line 125, in __init__
+  File "/common/users/sl2148/Public/yang_ouyang/projects/LostInTheSecond/LlamaFactory/src/llamafactory/hparams/training_args.py", line 100, in __post_init__
+    BaseTrainingArguments.__post_init__(self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/common/users/sl2148/anaconda3/lib/python3.13/site-packages/transformers/training_args.py", line 1524, in __post_init__
+    self._validate_args()
+    ~~~~~~~~~~~~~~~~~~~^^
+  File "/common/users/sl2148/anaconda3/lib/python3.13/site-packages/transformers/training_args.py", line 1686, in _validate_args
+    raise ValueError(error_message)
+ValueError: Your setup doesn't support bf16/gpu. You need to assign use_cpu if you want to train the model on CPU.

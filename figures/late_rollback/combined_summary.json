@@ -1,0 +1,34 @@
+{
+  "greedy": {
+    "accuracy": 0.8271417740712661,
+    "tokens_per_question": 318.5208491281274
+  },
+  "full_sc": {
+    "accuracy": 0.8559514783927218,
+    "tokens_per_question": 2534.8400303260046,
+    "K": 8
+  },
+  "late_rollback": {
+    "alpha_0.6": {
+      "accuracy": 0.8316906747536013,
+      "tokens_per_question": 997.6482183472327,
+      "gain_over_greedy": 0.004548900682335155,
+      "savings_vs_full_sc": 0.6064255706822944,
+      "gain_per_1k_tokens": 0.0066981554396279295
+    },
+    "alpha_0.7": {
+      "accuracy": 0.8271417740712661,
+      "tokens_per_question": 673.7717968157696,
+      "gain_over_greedy": 0.0,
+      "savings_vs_full_sc": 0.7341955355150691,
+      "gain_per_1k_tokens": 0.0
+    },
+    "alpha_0.8": {
+      "accuracy": 0.8278999241849886,
+      "tokens_per_question": 501.1683093252464,
+      "gain_over_greedy": 0.0007581501137224889,
+      "savings_vs_full_sc": 0.8022879931950612,
+      "gain_per_1k_tokens": 0.00415089327223203
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "n_docs": 512,
+  "n_correct": 379,
+  "n_wrong": 133,
+  "accuracy": 0.740234375,
+  "mean_entropy_correct": 0.073433440441254,
+  "mean_entropy_wrong": 0.08631078434126442,
+  "max_entropy_correct": 0.13220952506596306,
+  "max_entropy_wrong": 0.14954636090225565,
+  "spike_correct": 0.05877608462470907,
+  "spike_wrong": 0.06323557656099121,
+  "max_ent_relpos_correct": 0.13919969522949502,
+  "max_ent_relpos_wrong": 0.1823353964331408,
+  "ttest_mean_entropy_p": 2.769492416336412e-09,
+  "ttest_max_entropy_p": 1.1315614949571004e-06,
+  "ttest_spike_p": 0.09829944049925043,
+  "ttest_relpos_p": 0.1182414305454562,
+  "roc_auc_mean_entropy": 0.6683992302656377,
+  "roc_auc_max_entropy": 0.6303687979844069
+}
