@@ -173,7 +173,7 @@ def setup_parser() -> argparse.ArgumentParser:
         type=str,
         nargs="?",
         const=True,
-        default=False,
+        default=True,
         help=(
             "If True, apply chat template to the prompt. "
             "Providing `--apply_chat_template` without an argument will apply the default chat template to the prompt. "

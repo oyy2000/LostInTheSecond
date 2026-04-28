@@ -52,7 +52,6 @@ vectors_out/
 *.pt
 *.bin
 *.safetensors
-<<<<<<< HEAD
 *.npz
 *.pkl
 *.pickle
@@ -65,12 +64,8 @@ results/
 .specstory/
 
 # lm-evaluation-harness (vendored, large)
-lm-evaluation-harness/
+# lm-evaluation-harness/
 hendrycks_math_nvidia_model_test/
 
 # LlamaFactory (submodule)
 LlamaFactory/
-=======
-logs/
-artifacts_real/
->>>>>>> 39f31fb75d8275ce50398a277d5e9c08a8e201c0

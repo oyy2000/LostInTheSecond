@@ -171,21 +171,6 @@ def launch_shards(
         env["CUDA_VISIBLE_DEVICES"] = gpu_id
         env["TOKENIZERS_PARALLELISM"] = "false"
         print(f"  Shard {si} on GPU {gpu_id} ({len(shard_tasks[si])} tasks)")
-<<<<<<< HEAD
-        log_file = shard_dir / f"log_{si}.txt"
-        log_fh = log_file.open("w", encoding="utf-8")
-        p = subprocess.Popen(cmd, env=env,
-                             stdout=log_fh, stderr=subprocess.STDOUT)
-        procs.append((si, gpu_id, p, log_fh))
-
-    failed = []
-    for si, gpu_id, p, log_fh in procs:
-        p.wait()
-        log_fh.close()
-        rc = p.returncode
-        log_path = shard_dir / f"log_{si}.txt"
-        text = log_path.read_text("utf-8", errors="replace")
-=======
         p = subprocess.Popen(cmd, env=env,
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         procs.append((si, gpu_id, p))
@@ -195,7 +180,6 @@ def launch_shards(
         stdout, _ = p.communicate()
         text = (stdout.decode("utf-8", errors="replace") if stdout else "")
         rc = p.returncode
->>>>>>> 157b73200cc7137e5adbbe2a049fe49b4c83142e
         lines = text.strip().splitlines()
         tail = "\n".join(lines[-5:]) if lines else "(no output)"
         print(f"  Shard {si} (GPU {gpu_id}) exit={rc}\n{tail}")
@@ -203,11 +187,6 @@ def launch_shards(
             failed.append(si)
             if len(lines) > 5:
                 print("...\n" + "\n".join(lines[-20:]))
-<<<<<<< HEAD
-        else:
-            log_path.unlink(missing_ok=True)
-=======
->>>>>>> 157b73200cc7137e5adbbe2a049fe49b4c83142e
     if failed:
         print(f"ERROR: shards {failed} failed!")
         sys.exit(1)
