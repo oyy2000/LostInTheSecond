@@ -48,9 +48,29 @@ artifacts_local/
 wandb/
 vectors_out/
 
-# Optional local data dumps
+# Large binary files
 *.pt
 *.bin
 *.safetensors
+<<<<<<< HEAD
+*.npz
+*.pkl
+*.pickle
+
+# Large result files -- keep results locally, don't push
+# (checkpoint jsonl, hidden states, raw outputs, etc.)
+results/
+
+# Specstory (Cursor conversation history, large & noisy)
+.specstory/
+
+# lm-evaluation-harness (vendored, large)
+lm-evaluation-harness/
+hendrycks_math_nvidia_model_test/
+
+# LlamaFactory (submodule)
+LlamaFactory/
+=======
 logs/
 artifacts_real/
+>>>>>>> 39f31fb75d8275ce50398a277d5e9c08a8e201c0

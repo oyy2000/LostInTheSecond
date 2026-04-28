@@ -1,0 +1,100 @@
+{
+  "dataset": "CodeContests",
+  "by_bucket": {
+    "early": {
+      "n": 542,
+      "r_bad_mean": 0.0,
+      "r_bad_se": 0.0,
+      "r_fix_mean": 0.018911439114391145,
+      "r_fix_se": 0.004324456305234235,
+      "delta_mean": 0.018911439114391145,
+      "delta_se": 0.004324456305234235,
+      "delta_ttest_t": 4.3691007029045545,
+      "delta_ttest_p": 1.4959466811546927e-05
+    },
+    "late": {
+      "n": 79,
+      "r_bad_mean": 0.0,
+      "r_bad_se": 0.0,
+      "r_fix_mean": 0.012658227848101266,
+      "r_fix_se": 0.008836692198446107,
+      "delta_mean": 0.012658227848101266,
+      "delta_se": 0.008836692198446107,
+      "delta_ttest_t": 1.4233671437735331,
+      "delta_ttest_p": 0.15861749001123515
+    }
+  },
+  "by_tau": {
+    "2": {
+      "n": 273,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.009157509157509158,
+      "delta_mean": 0.009157509157509158,
+      "delta_se": 0.004259344419219829
+    },
+    "3": {
+      "n": 269,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.028810408921933085,
+      "delta_mean": 0.028810408921933085,
+      "delta_se": 0.0075174045516005275
+    },
+    "4": {
+      "n": 55,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.0,
+      "delta_mean": 0.0,
+      "delta_se": 0.0
+    },
+    "5": {
+      "n": 6,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.16666666666666666,
+      "delta_mean": 0.16666666666666666,
+      "delta_se": 0.09622504486493763
+    },
+    "6": {
+      "n": 18,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.0,
+      "delta_mean": 0.0,
+      "delta_se": 0.0
+    }
+  },
+  "between_bucket_test": {
+    "delta_early_mean": 0.018911439114391145,
+    "delta_late_mean": 0.012658227848101266,
+    "welch_t": 0.6322385600672357,
+    "welch_p": 0.5284502581470594,
+    "mann_whitney_U": 21843.5,
+    "mann_whitney_p": 0.40962835477591675,
+    "cohens_d": 0.06904967868259229,
+    "n_early": 542,
+    "n_late": 79
+  },
+  "relative_position_test": {
+    "spearman_rho_delta": 0.08698229296909679,
+    "spearman_p_delta": 0.030209736960386327,
+    "spearman_rho_r_bad": NaN,
+    "spearman_p_r_bad": NaN,
+    "median_split_welch_t": -1.0041182250971046,
+    "median_split_welch_p": 0.3162487674837582,
+    "terciles": {
+      "boundaries": [
+        0.4,
+        0.5
+      ],
+      "means": [
+        0.001336898395721925,
+        0.021739130434782608,
+        0.02664576802507837
+      ],
+      "ns": [
+        187,
+        115,
+        319
+      ]
+    }
+  },
+  "n_paired_samples": 621
+}

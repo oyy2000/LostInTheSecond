@@ -1,0 +1,179 @@
+{
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "Ks": [
+    8,
+    16,
+    32
+  ],
+  "alphas": [
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8
+  ],
+  "n_questions": 1319,
+  "greedy_accuracy": 0.8271417740712661,
+  "greedy_tokens_per_question": 318.5208491281274,
+  "grid": {
+    "LR_K8_a0.4": {
+      "method": "late_rollback",
+      "K": 8,
+      "alpha": 0.4,
+      "accuracy": 0.8415466262319939,
+      "total_tokens": 2090598,
+      "tokens_per_question": 1584.9871114480668,
+      "gain_over_greedy": 0.014404852160727843
+    },
+    "LR_K16_a0.4": {
+      "method": "late_rollback",
+      "K": 16,
+      "alpha": 0.4,
+      "accuracy": 0.8453373768006065,
+      "total_tokens": 4002810,
+      "tokens_per_question": 3034.7308567096284,
+      "gain_over_greedy": 0.0181956027293404
+    },
+    "LR_K32_a0.4": {
+      "method": "late_rollback",
+      "K": 32,
+      "alpha": 0.4,
+      "accuracy": 0.8468536770280516,
+      "total_tokens": 7819329,
+      "tokens_per_question": 5928.225170583775,
+      "gain_over_greedy": 0.019711902956785488
+    },
+    "LR_K8_a0.5": {
+      "method": "late_rollback",
+      "K": 8,
+      "alpha": 0.5,
+      "accuracy": 0.8415466262319939,
+      "total_tokens": 1755077,
+      "tokens_per_question": 1330.611827141774,
+      "gain_over_greedy": 0.014404852160727843
+    },
+    "LR_K16_a0.5": {
+      "method": "late_rollback",
+      "K": 16,
+      "alpha": 0.5,
+      "accuracy": 0.8400303260045489,
+      "total_tokens": 3277343,
+      "tokens_per_question": 2484.7179681576954,
+      "gain_over_greedy": 0.012888551933282755
+    },
+    "LR_K32_a0.5": {
+      "method": "late_rollback",
+      "K": 32,
+      "alpha": 0.5,
+      "accuracy": 0.8430629264594389,
+      "total_tokens": 6320224,
+      "tokens_per_question": 4791.678544351782,
+      "gain_over_greedy": 0.01592115238817282
+    },
+    "LR_K8_a0.6": {
+      "method": "late_rollback",
+      "K": 8,
+      "alpha": 0.6,
+      "accuracy": 0.8362395754359363,
+      "total_tokens": 1315977,
+      "tokens_per_question": 997.7081122062168,
+      "gain_over_greedy": 0.0090978013646702
+    },
+    "LR_K16_a0.6": {
+      "method": "late_rollback",
+      "K": 16,
+      "alpha": 0.6,
+      "accuracy": 0.8339651250947687,
+      "total_tokens": 2339979,
+      "tokens_per_question": 1774.0553449583017,
+      "gain_over_greedy": 0.006823351023502622
+    },
+    "LR_K32_a0.6": {
+      "method": "late_rollback",
+      "K": 32,
+      "alpha": 0.6,
+      "accuracy": 0.8354814253222138,
+      "total_tokens": 4390464,
+      "tokens_per_question": 3328.630780894617,
+      "gain_over_greedy": 0.00833965125094771
+    },
+    "LR_K8_a0.7": {
+      "method": "late_rollback",
+      "K": 8,
+      "alpha": 0.7,
+      "accuracy": 0.8256254738438211,
+      "total_tokens": 887488,
+      "tokens_per_question": 672.8491281273692,
+      "gain_over_greedy": -0.0015163002274449777
+    },
+    "LR_K16_a0.7": {
+      "method": "late_rollback",
+      "K": 16,
+      "alpha": 0.7,
+      "accuracy": 0.8256254738438211,
+      "total_tokens": 1422509,
+      "tokens_per_question": 1078.475360121304,
+      "gain_over_greedy": -0.0015163002274449777
+    },
+    "LR_K32_a0.7": {
+      "method": "late_rollback",
+      "K": 32,
+      "alpha": 0.7,
+      "accuracy": 0.8278999241849886,
+      "total_tokens": 2492813,
+      "tokens_per_question": 1889.926459438969,
+      "gain_over_greedy": 0.0007581501137224889
+    },
+    "LR_K8_a0.8": {
+      "method": "late_rollback",
+      "K": 8,
+      "alpha": 0.8,
+      "accuracy": 0.8263836239575436,
+      "total_tokens": 662461,
+      "tokens_per_question": 502.24488248673237,
+      "gain_over_greedy": -0.0007581501137224889
+    },
+    "LR_K16_a0.8": {
+      "method": "late_rollback",
+      "K": 16,
+      "alpha": 0.8,
+      "accuracy": 0.8271417740712661,
+      "total_tokens": 937876,
+      "tokens_per_question": 711.0507960576194,
+      "gain_over_greedy": 0.0
+    },
+    "LR_K32_a0.8": {
+      "method": "late_rollback",
+      "K": 32,
+      "alpha": 0.8,
+      "accuracy": 0.8286580742987112,
+      "total_tokens": 1491934,
+      "tokens_per_question": 1131.1099317664898,
+      "gain_over_greedy": 0.0015163002274450887
+    },
+    "FullSC_K8": {
+      "method": "full_sc",
+      "K": 8,
+      "accuracy": 0.8589840788476119,
+      "total_tokens": 3350576,
+      "tokens_per_question": 2540.2395754359363,
+      "gain_over_greedy": 0.03184230477634575
+    },
+    "FullSC_K16": {
+      "method": "full_sc",
+      "K": 16,
+      "accuracy": 0.865049279757392,
+      "total_tokens": 6707966,
+      "tokens_per_question": 5085.645185746778,
+      "gain_over_greedy": 0.037907505686125886
+    },
+    "FullSC_K32": {
+      "method": "full_sc",
+      "K": 32,
+      "accuracy": 0.8779378316906747,
+      "total_tokens": 13409622,
+      "tokens_per_question": 10166.506444275967,
+      "gain_over_greedy": 0.05079605761940864
+    }
+  }
+}

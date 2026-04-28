@@ -1,0 +1,38 @@
+# Default sweep configuration
+# Override any field via CLI: --model-id, --dataset, --Ks, etc.
+#
+# K = per-draft sample budget.
+#   Each draft produces K answers: 1 greedy + (K-1) suffixes.
+#   K=2 means 1 extra suffix per draft.
+#   Total budget per question = n_drafts * K.
+#
+# Draft mode: draft_idx=0 is greedy (temperature=0),
+#   draft_idx>=1 are sampled (temperature>0).
+#
+# Competition datasets (aime2024, amc2023, olympiadbench) auto-scale
+# max_tokens -> 4096, max_model_len -> 8192.
+
+model_id: "Qwen/Qwen2.5-3B-Instruct"
+dataset: "gsm8k"
+gpus: "0,1,2,3,4,5,6,7"
+
+# data
+n_sample: 0          # 0 = use full dataset
+seed: 42
+
+# sweep grid
+n_drafts_list: [2, 4, 8]
+alphas: [0.6, 0.8]
+Ks: [2, 3, 4]
+
+# Full SC baseline: fixed sample count
+fullsc_n: 40
+
+# generation (base values; competition datasets auto-upscale)
+temperature: 0.7
+top_p: 0.95
+max_tokens: 2048
+
+# vLLM
+gpu_memory_utilization: 0.92
+max_model_len: 4096

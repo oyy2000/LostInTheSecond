@@ -1,0 +1,44 @@
+# Pareto sweep configuration for Experiment 1
+# Covers all 4 model x dataset combos
+
+models:
+  - "meta-llama/Llama-3.2-3B-Instruct"
+  - "Qwen/Qwen2.5-3B-Instruct"
+
+datasets:
+  - "gsm8k"
+  - "math500"
+
+gpus: "0,1,2,3,4,5,6,7"
+
+# SC baseline: sample counts to evaluate
+sc_ns: [1, 2, 4, 8, 16, 32]
+
+# Random-repair: per-step trigger probabilities
+random_ps: [0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5]
+
+# Entropy-triggered repair: threshold percentiles to sweep
+entropy_percentiles: [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 95]
+
+# Trigger metrics for entropy-based methods
+trigger_metrics:
+  lookback: "logprob_drop"
+  lookahead: "mean_entropy"
+
+# Repair budget per triggered step
+repair_k: 3
+
+# Max repairs per trajectory
+max_repairs: 3
+
+# Generation parameters
+temperature: 0.7
+top_p: 0.95
+max_tokens: 2048
+gpu_memory_utilization: 0.92
+max_model_len: 4096
+
+# Full SC sample pool (reuse from sweep engine)
+fullsc_n: 40
+
+seed: 42

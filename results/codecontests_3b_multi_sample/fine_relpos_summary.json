@@ -1,0 +1,157 @@
+{
+  "dataset": "CodeContests",
+  "n_bins": 5,
+  "n_questions": 80,
+  "aggregation": "per_question (doc_id), tau averaged across samples",
+  "bins": [
+    {
+      "idx": 0,
+      "label": "[0.19, 0.33)",
+      "short_label": "Q1",
+      "range": [
+        0.19318181818181818,
+        0.32142857142857145
+      ],
+      "n": 10,
+      "delta_mean": 0.0,
+      "delta_se": 0.0,
+      "delta_median": 0.0,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.0
+    },
+    {
+      "idx": 1,
+      "label": "[0.33, 0.43)",
+      "short_label": "Q2",
+      "range": [
+        0.3333333333333333,
+        0.4
+      ],
+      "n": 21,
+      "delta_mean": 0.013392857142857142,
+      "delta_se": 0.011923348585720318,
+      "delta_median": 0.0,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.013392857142857142
+    },
+    {
+      "idx": 2,
+      "label": "[0.43, 0.50)",
+      "short_label": "Q3",
+      "range": [
+        0.42857142857142855,
+        0.47916666666666663
+      ],
+      "n": 10,
+      "delta_mean": 0.00625,
+      "delta_se": 0.004166666666666667,
+      "delta_median": 0.0,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.00625
+    },
+    {
+      "idx": 3,
+      "label": "[0.50, 0.60)",
+      "short_label": "Q4",
+      "range": [
+        0.5,
+        0.5833333333333334
+      ],
+      "n": 18,
+      "delta_mean": 0.034722222222222224,
+      "delta_se": 0.024739359375777956,
+      "delta_median": 0.0,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.034722222222222224
+    },
+    {
+      "idx": 4,
+      "label": "[0.60, 0.80)",
+      "short_label": "Q5",
+      "range": [
+        0.6,
+        0.8
+      ],
+      "n": 21,
+      "delta_mean": 0.02189625850340136,
+      "delta_se": 0.011546909887254472,
+      "delta_median": 0.0,
+      "r_bad_mean": 0.0,
+      "r_fix_mean": 0.02189625850340136
+    }
+  ],
+  "pairwise_tests": {
+    "Q1_vs_Q2": {
+      "welch_t": -1.123246296673465,
+      "welch_p": 0.27463583150057924,
+      "mann_whitney_U": 95.0,
+      "mann_whitney_p": 0.3459724529122624
+    },
+    "Q1_vs_Q3": {
+      "welch_t": -1.4999999999999998,
+      "welch_p": 0.16785065605707492,
+      "mann_whitney_U": 40.0,
+      "mann_whitney_p": 0.16748875557485465
+    },
+    "Q1_vs_Q4": {
+      "welch_t": -1.4035214774485383,
+      "welch_p": 0.17846413838552758,
+      "mann_whitney_U": 70.0,
+      "mann_whitney_p": 0.12442204793066206
+    },
+    "Q1_vs_Q5": {
+      "welch_t": -1.8962872939339852,
+      "welch_p": 0.0724623200907076,
+      "mann_whitney_U": 85.0,
+      "mann_whitney_p": 0.157303608921894
+    },
+    "Q2_vs_Q3": {
+      "welch_t": 0.5655283555515275,
+      "welch_p": 0.5768836383569516,
+      "mann_whitney_U": 95.0,
+      "mann_whitney_p": 0.49032736194139526
+    },
+    "Q2_vs_Q4": {
+      "welch_t": -0.7766655582943776,
+      "welch_p": 0.44473573058316307,
+      "mann_whitney_U": 165.0,
+      "mann_whitney_p": 0.2915117771001463
+    },
+    "Q2_vs_Q5": {
+      "welch_t": -0.5123113175672691,
+      "welch_p": 0.6112534007279038,
+      "mann_whitney_U": 200.0,
+      "mann_whitney_p": 0.4083680167535182
+    },
+    "Q3_vs_Q4": {
+      "welch_t": -1.1349037361323229,
+      "welch_p": 0.27134324932340687,
+      "mann_whitney_U": 86.0,
+      "mann_whitney_p": 0.8146823387387518
+    },
+    "Q3_vs_Q5": {
+      "welch_t": -1.274574009561556,
+      "welch_p": 0.21435904488816063,
+      "mann_whitney_U": 103.0,
+      "mann_whitney_p": 0.9267211592786144
+    },
+    "Q4_vs_Q5": {
+      "welch_t": 0.469791243567682,
+      "welch_p": 0.6427037626893852,
+      "mann_whitney_U": 194.0,
+      "mann_whitney_p": 0.8573712976195422
+    }
+  },
+  "kruskal_wallis": {
+    "H": 3.347814257096479,
+    "p": 0.501392334406167
+  },
+  "jonckheere_terpstra": {
+    "z": 0.9868461251691545,
+    "p": 0.3237180787435441
+  },
+  "spearman": {
+    "rho": 0.20633061480032266,
+    "p": 0.06632150798091084
+  }
+}
