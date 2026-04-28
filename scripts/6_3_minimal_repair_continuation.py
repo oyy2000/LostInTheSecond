@@ -342,6 +342,7 @@ def main() -> None:
 
         print(f"  Launching shard {si} on GPU {gpu_id} "
               f"({len(shard_tasks[si])} prompts)...")
+<<<<<<< HEAD
         log_file = shard_dir / f"log_{si}.txt"
         log_fh = log_file.open("w", encoding="utf-8")
         p = subprocess.Popen(
@@ -357,6 +358,21 @@ def main() -> None:
         rc = p.returncode
         log_path = shard_dir / f"log_{si}.txt"
         output_text = log_path.read_text("utf-8", errors="replace")
+=======
+        p = subprocess.Popen(
+            cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        )
+        procs.append((si, gpu_id, p))
+
+    failed_shards: List[int] = []
+    succeeded_shards: List[int] = []
+    for si, gpu_id, p in procs:
+        stdout, _ = p.communicate()
+        output_text = (
+            stdout.decode("utf-8", errors="replace") if stdout else ""
+        )
+        rc = p.returncode
+>>>>>>> 157b73200cc7137e5adbbe2a049fe49b4c83142e
         lines = output_text.strip().splitlines()
         tail = "\n".join(lines[-5:]) if lines else "(no output)"
         print(f"\n--- Shard {si} (GPU {gpu_id}) exit={rc} ---\n{tail}")
@@ -366,7 +382,10 @@ def main() -> None:
                 print("...\n" + "\n".join(lines[-20:]))
         else:
             succeeded_shards.append(si)
+<<<<<<< HEAD
             log_path.unlink(missing_ok=True)
+=======
+>>>>>>> 157b73200cc7137e5adbbe2a049fe49b4c83142e
 
     # Merge only succeeded shard outputs into the main file (append mode)
     n_new = 0

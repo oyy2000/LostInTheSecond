@@ -116,6 +116,7 @@ def build_fix_later_prefix(steps: List[str], cascade_step: int,
     return "\n\n".join(prefix_parts)
 
 
+<<<<<<< HEAD
 def build_fix_first_keep_middle_prefix(
     steps: List[str], first_err_step: int, first_correction: str,
     cascade_step: int,
@@ -132,6 +133,8 @@ def build_fix_first_keep_middle_prefix(
     return "\n\n".join(prefix_parts)
 
 
+=======
+>>>>>>> 157b73200cc7137e5adbbe2a049fe49b4c83142e
 def load_cascade_samples(cascade_file: str, limit: int):
     path = Path(cascade_file)
     if not path.exists():
@@ -255,7 +258,11 @@ def _print_summary(merged_path: Path, shard_dir: Path) -> None:
 
     n_total = len(results)
     print(f"\n=== Cascade recovery rates ({n_total} continuations) ===")
+<<<<<<< HEAD
     for cond in ["fix_first", "fix_later", "fix_first_keep_middle"]:
+=======
+    for cond in ["fix_first", "fix_later"]:
+>>>>>>> 157b73200cc7137e5adbbe2a049fe49b4c83142e
         vals = by_cond[cond]
         if vals:
             rate = sum(vals) / len(vals)
@@ -305,15 +312,21 @@ def main() -> None:
             pf_later = build_fix_later_prefix(steps, cascade_step, ce["correction"])
             prompt_later = build_chat_prompt(s["question"]) + pf_later + "\n\n"
 
+<<<<<<< HEAD
             pf_fkm = build_fix_first_keep_middle_prefix(
                 steps, first_step, fe["correction"], cascade_step)
             prompt_fkm = build_chat_prompt(s["question"]) + pf_fkm + "\n\n"
 
+=======
+>>>>>>> 157b73200cc7137e5adbbe2a049fe49b4c83142e
             for ci in range(args.n_continuations):
                 for cond, prefix_text, prompt in [
                     ("fix_first", pf_first, prompt_first),
                     ("fix_later", pf_later, prompt_later),
+<<<<<<< HEAD
                     ("fix_first_keep_middle", pf_fkm, prompt_fkm),
+=======
+>>>>>>> 157b73200cc7137e5adbbe2a049fe49b4c83142e
                 ]:
                     key = _task_key(s["doc_id"], s["sample_idx"], pi, cond, ci)
                     if key in completed:
@@ -377,6 +390,7 @@ def main() -> None:
 
         print(f"  Launching shard {si} on GPU {gpu_id} "
               f"({len(shard_tasks[si])} prompts)...")
+<<<<<<< HEAD
         log_file = shard_dir / f"log_{si}.txt"
         log_fh = log_file.open("w", encoding="utf-8")
         p = subprocess.Popen(
@@ -392,6 +406,19 @@ def main() -> None:
         log_file = shard_dir / f"log_{si}.txt"
         log_text = log_file.read_text("utf-8", errors="replace")
         lines = log_text.strip().splitlines()
+=======
+        p = subprocess.Popen(
+            cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        procs.append((si, gpu_id, p))
+
+    failed_shards: List[int] = []
+    succeeded_shards: List[int] = []
+    for si, gpu_id, p in procs:
+        stdout, _ = p.communicate()
+        output_text = stdout.decode("utf-8", errors="replace") if stdout else ""
+        rc = p.returncode
+        lines = output_text.strip().splitlines()
+>>>>>>> 157b73200cc7137e5adbbe2a049fe49b4c83142e
         tail = "\n".join(lines[-5:]) if lines else "(no output)"
         print(f"\n--- Shard {si} (GPU {gpu_id}) exit={rc} ---\n{tail}")
         if rc != 0:
@@ -400,7 +427,10 @@ def main() -> None:
                 print("...\n" + "\n".join(lines[-20:]))
         else:
             succeeded_shards.append(si)
+<<<<<<< HEAD
             log_file.unlink(missing_ok=True)
+=======
+>>>>>>> 157b73200cc7137e5adbbe2a049fe49b4c83142e
 
     n_new = 0
     ok_files = {shard_dir / f"shard_{si}.jsonl" for si in succeeded_shards}
