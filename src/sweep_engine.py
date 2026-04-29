@@ -44,11 +44,53 @@ ROOT = Path(__file__).resolve().parent.parent
 # are queued for the next round. Checkpoint is saved between rounds.
 BATCH_PER_GPU = 8000
 
+# GPU memory threshold (MiB): a GPU is considered "free" when its used memory
+# is below this value.  Polled via nvidia-smi.
+GPU_FREE_THRESHOLD_MIB = 1000
+GPU_POLL_INTERVAL_SEC = 30
+
 
 def _batched(lst: list, n: int):
     """Yield successive chunks of size n."""
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
+
+
+def _gpu_mem_used(gpu_id: str) -> int:
+    """Return memory used (MiB) for a single GPU via nvidia-smi. -1 on error."""
+    try:
+        out = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=memory.used",
+             "--format=csv,noheader,nounits", f"--id={gpu_id}"],
+            text=True, timeout=10,
+        )
+        return int(out.strip().split("\n")[0])
+    except Exception:
+        return -1
+
+
+def _wait_for_free_gpus(gpu_ids: List[str], timeout: int = 0):
+    """Block until all *gpu_ids* have memory usage below threshold.
+
+    timeout=0 means wait forever.
+    """
+    start = time.time()
+    while True:
+        busy = []
+        for gid in gpu_ids:
+            used = _gpu_mem_used(gid)
+            if used < 0 or used >= GPU_FREE_THRESHOLD_MIB:
+                busy.append((gid, used))
+        if not busy:
+            return
+        elapsed = time.time() - start
+        names = ", ".join(f"GPU {g} ({u} MiB)" for g, u in busy)
+        print(f"  [queue] waiting for GPUs: {names}  "
+              f"(elapsed {_fmt(elapsed)})", flush=True)
+        if timeout and elapsed > timeout:
+            raise RuntimeError(
+                f"Timed out waiting for GPUs {gpu_ids} after {_fmt(elapsed)}")
+        time.sleep(GPU_POLL_INTERVAL_SEC)
 
 
 @dataclass
@@ -195,6 +237,9 @@ def _launch(
     """Split tasks across GPUs, run subprocesses, collect results."""
     if not tasks:
         return []
+
+    _wait_for_free_gpus(gpu_ids)
+
     ns = len(gpu_ids)
     shards: List[List[dict]] = [[] for _ in range(ns)]
     for i, t in enumerate(tasks):

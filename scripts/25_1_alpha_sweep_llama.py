@@ -23,11 +23,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.sweep_engine import SweepConfig, run_shard, run_sweep
 
-MODEL = "meta-llama/Llama-3.2-3B-Instruct" # "Qwen/Qwen2.5-3B-Instruct"
+MODEL = "Qwen/Qwen2.5-3B-Instruct" # "Qwen/Qwen2.5-3B-Instruct"
 DATASETS = [
-    "math500", "gsm8k", # "aime2024", "amc2023", "olympiadbench",
+   "gsm8k", "math500", "hotpotqa", "aime2024", "amc2023", "olympiadbench", "humaneval"
 ]
-ALPHAS = [0.2,0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+ALPHAS = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
 
 
 def parse_args():

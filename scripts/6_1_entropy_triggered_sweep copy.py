@@ -49,7 +49,7 @@ PYTHON = "/common/users/sl2148/anaconda3/envs/vllmdebug/bin/python"
 # -- defaults ---------------------------------------------------------------
 ND_MAX = 4
 K_MAX = 3
-FULLSC_N = 40
+FULLSC_N = 16
 TEMPERATURE = 0.7
 TOP_P = 0.95
 MAX_TOKENS = 2048
@@ -354,10 +354,10 @@ def evaluate_all(questions, drafts, logprob_recs, suffix_recs, sc_recs, rb_point
     for d in drafts:
         draft_map[(d["doc_id"], d["draft_idx"])] = d
 
-    # organize logprob by (doc_id, draft_idx)
+    # organize logprob by doc_id (only draft_idx=0)
     lp_map = {}
     for r in logprob_recs:
-        lp_map[(r["doc_id"], r.get("draft_idx", 0))] = r
+        lp_map[r["doc_id"]] = r
 
     # organize suffixes by (doc_id, draft_idx, rollback_step, suffix_idx)
     sfx_map = {}
@@ -381,7 +381,7 @@ def evaluate_all(questions, drafts, logprob_recs, suffix_recs, sc_recs, rb_point
     sc_by_doc = {}
     for s in sc_recs:
         sc_by_doc.setdefault(s["doc_id"], []).append(s)
-    for N in [8, 16, 24, 32, 40]:
+    for N in [2, 4, 8, 16, 32]:
         correct = 0
         total_toks = 0
         for q in questions:
@@ -397,11 +397,7 @@ def evaluate_all(questions, drafts, logprob_recs, suffix_recs, sc_recs, rb_point
     nd_vals = [1, 2]
     k_vals = [2, 3]
 
-    all_mkeys = ["minlp", "prm", "prm_skip0", "prm_entg"]
-    for thr in [0.7]:
-        all_mkeys.append(f"prm_thr{thr}")
-    for delta in [0.3]:
-        all_mkeys.append(f"prm_drop{delta}")
+    all_mkeys = ["minlp", "prm"]
     for a in ALPHA_VALUES:
         all_mkeys.append(f"alpha_{a}")
     for p in RANDOM_PROBS:
@@ -420,6 +416,10 @@ def evaluate_all(questions, drafts, logprob_recs, suffix_recs, sc_recs, rb_point
                     did = q["doc_id"]
                     answers = []
                     q_toks = 0
+                    lp_rec = lp_map.get(did)
+                    lp_cost = lp_rec["logprob_prompt_tokens"] if lp_rec else 0
+                    if mkey in ("minlp", "prm"):
+                        q_toks += lp_cost
 
                     for di in range(nd):
                         d = draft_map.get((did, di))
@@ -427,11 +427,6 @@ def evaluate_all(questions, drafts, logprob_recs, suffix_recs, sc_recs, rb_point
                             continue
                         answers.append(d["draft_answer"])
                         q_toks += d["draft_tokens"]
-                        if mkey in ("minlp", "prm", "prm_skip0", "prm_entg") or \
-                                mkey.startswith("prm_thr") or mkey.startswith("prm_drop"):
-                            lp_rec = lp_map.get((did, di))
-                            if lp_rec:
-                                q_toks += lp_rec["logprob_prompt_tokens"]
                         rb = rb_points.get((did, di, mkey))
                         if rb is not None:
                             for si in range(K - 1):
@@ -503,25 +498,23 @@ def main():
     drafts = [r for r in existing if r.get("task_type") == "draft"]
     print(f"Total drafts: {len(drafts)}")
 
-    # ---- Phase 2: Logprob scoring on ALL drafts ----------------------------
-    done_lp = {(r["doc_id"], r.get("draft_idx", 0))
-               for r in existing if r.get("task_type") == "logprob"}
+    # ---- Phase 2: Logprob scoring on draft-0 ------------------------------
+    done_lp = {r["doc_id"] for r in existing if r.get("task_type") == "logprob"}
     lp_tasks = []
-    draft_map_all = {(r["doc_id"], r["draft_idx"]): r for r in drafts}
+    d0_map = {r["doc_id"]: r for r in drafts if r["draft_idx"] == 0}
     for q in questions:
-        for di in range(args.nd_max):
-            if (q["doc_id"], di) in done_lp:
-                continue
-            d = draft_map_all.get((q["doc_id"], di))
-            if not d:
-                continue
-            p = build_prompt(MODEL_ID, DATASET, q["question"])
-            full = p + d["draft_text"]
-            lp_tasks.append(dict(
-                task_type="logprob", doc_id=q["doc_id"], draft_idx=di,
-                prompt=full, resp_char_offset=len(p),
-                draft_steps=d["draft_steps"], n_steps=d["n_steps"],
-            ))
+        if q["doc_id"] in done_lp:
+            continue
+        d0 = d0_map.get(q["doc_id"])
+        if not d0:
+            continue
+        p = build_prompt(MODEL_ID, DATASET, q["question"])
+        full = p + d0["draft_text"]
+        lp_tasks.append(dict(
+            task_type="logprob", doc_id=q["doc_id"],
+            prompt=full, resp_char_offset=len(p),
+            draft_steps=d0["draft_steps"], n_steps=d0["n_steps"],
+        ))
     if lp_tasks:
         print(f"\n--- Phase 2: {len(lp_tasks)} logprob scorings ---")
         new = launch_shards(lp_tasks, gpu_ids, sd / "p2")
@@ -532,28 +525,26 @@ def main():
     lp_recs = [r for r in existing if r.get("task_type") == "logprob"]
     print(f"Total logprob records: {len(lp_recs)}")
 
-    # ---- Phase 2.5: PRM scoring on ALL drafts ------------------------------
-    done_se = {(r["doc_id"], r.get("draft_idx", 0))
-               for r in existing if r.get("task_type") == "self_eval"}
+    # ---- Phase 2.5: PRM scoring on draft-0 steps ---------------------------
+    done_se = {r["doc_id"] for r in existing if r.get("task_type") == "self_eval"}
     se_tasks = []
     for q in questions:
-        for di in range(args.nd_max):
-            if (q["doc_id"], di) in done_se:
-                continue
-            d = draft_map_all.get((q["doc_id"], di))
-            if not d or not d["draft_steps"]:
-                continue
-            steps = d["draft_steps"]
-            step_text = "<extra_0>".join(steps) + "<extra_0>"
-            messages = [
-                {"role": "system", "content": "Please reason step by step, and put your final answer within \\boxed{}."},
-                {"role": "user", "content": q["question"]},
-                {"role": "assistant", "content": step_text},
-            ]
-            se_tasks.append(dict(
-                task_type="self_eval", doc_id=q["doc_id"], draft_idx=di,
-                n_steps=len(steps), prompt=messages,
-            ))
+        if q["doc_id"] in done_se:
+            continue
+        d0 = d0_map.get(q["doc_id"])
+        if not d0 or not d0["draft_steps"]:
+            continue
+        steps = d0["draft_steps"]
+        step_text = "<extra_0>".join(steps) + "<extra_0>"
+        messages = [
+            {"role": "system", "content": "Please reason step by step, and put your final answer within \\boxed{}."},
+            {"role": "user", "content": q["question"]},
+            {"role": "assistant", "content": step_text},
+        ]
+        se_tasks.append(dict(
+            task_type="self_eval", doc_id=q["doc_id"],
+            n_steps=len(steps), prompt=messages,
+        ))
     if se_tasks:
         print(f"\n--- Phase 2.5: {len(se_tasks)} PRM scorings ---")
         new = launch_shards(se_tasks, gpu_ids, sd / "p2se", prm=True)
@@ -564,89 +555,79 @@ def main():
     se_recs = [r for r in existing if r.get("task_type") == "self_eval"]
     print(f"Total PRM records: {len(se_recs)}")
 
-    # build per-(doc, draft) step scores
-    se_by_draft = {}
+    # build per-doc step scores
+    se_by_doc = {}
     for r in se_recs:
-        se_by_draft[(r["doc_id"], r.get("draft_idx", 0))] = r.get("step_scores", [])
+        se_by_doc[r["doc_id"]] = r.get("step_scores", [])
 
-    # ---- Compute per-draft rollback points -----------------------------------
-    lp_by_draft = {}
-    for r in lp_recs:
-        lp_by_draft[(r["doc_id"], r.get("draft_idx", 0))] = r
+    # ---- Compute per-doc alpha from draft-0 signals -------------------------
+    lp_by_doc = {r["doc_id"]: r for r in lp_recs}
 
     import random as _rng
     _rng.seed(42)
 
     q_map = {q["doc_id"]: q for q in questions}
+    draft_map_all = {(r["doc_id"], r["draft_idx"]): r for r in drafts}
 
-    rb_points = {}  # (doc_id, draft_idx, method_key) -> rollback_step
+    # For each doc, compute alpha from draft-0 using min_logprob and PRM
+    doc_alpha = {}  # doc_id -> {"minlp": alpha, "prm": alpha}
     for q in questions:
         did = q["doc_id"]
+        d0 = d0_map.get(did)
+        if not d0 or not d0["draft_steps"]:
+            continue
+        steps = d0["draft_steps"]
+        n = len(steps)
+        if n < 2:
+            continue
+        response = d0["draft_text"]
+        bounds = step_char_bounds(response, steps)
+
+        alphas = {}
+
+        lp_rec = lp_by_doc.get(did)
+        if lp_rec:
+            sm = compute_step_metrics(
+                lp_rec["token_logprobs"], lp_rec["token_offsets"], bounds)
+            worst_lp = min(range(n), key=lambda t: sm[t]["min_logprob"])
+            alphas["minlp"] = worst_lp / n
+
+        se_scores = se_by_doc.get(did, [])
+        if se_scores and len(se_scores) >= n:
+            worst_prm = min(range(n), key=lambda t: se_scores[t])
+            alphas["prm"] = worst_prm / n
+
+        doc_alpha[did] = alphas
+
+    # Build rb_points: for each (doc, draft_idx, method) -> rollback step
+    method_keys = ["minlp", "prm"]
+    rb_points = {}
+    for q in questions:
+        did = q["doc_id"]
+        alphas = doc_alpha.get(did, {})
         for di in range(args.nd_max):
             d = draft_map_all.get((did, di))
             if not d or not d.get("draft_steps"):
                 continue
-            steps = d["draft_steps"]
-            n = len(steps)
-            if n < 2:
-                continue
-
-            # min_logprob: argmin over this draft's logprob
-            lp_rec = lp_by_draft.get((did, di))
-            if lp_rec:
-                bounds = step_char_bounds(d["draft_text"], steps)
-                sm = compute_step_metrics(
-                    lp_rec["token_logprobs"], lp_rec["token_offsets"], bounds)
-                worst_lp = min(range(n), key=lambda t: sm[t]["min_logprob"])
-                rb_points[(did, di, "minlp")] = worst_lp
-
-            # PRM: argmin over this draft's PRM scores
-            se_scores = se_by_draft.get((did, di), [])
-            if se_scores and len(se_scores) >= n:
-                worst_prm = min(range(n), key=lambda t: se_scores[t])
-                rb_points[(did, di, "prm")] = worst_prm
-
-                # PRM variant: skip step 0
-                worst_skip0 = min(range(1, n), key=lambda t: se_scores[t])
-                rb_points[(did, di, "prm_skip0")] = worst_skip0
-
-                # PRM variant: threshold gating
-                for thr in [0.7]:
-                    if se_scores[worst_prm] < thr:
-                        rb_points[(did, di, f"prm_thr{thr}")] = worst_prm
-
-                # PRM variant: score drop
-                prm_drops = [se_scores[i] - se_scores[i + 1]
-                             for i in range(n - 1)]
-                if prm_drops:
-                    md_idx = int(np.argmax(prm_drops))
-                    for delta in [0.3]:
-                        if prm_drops[md_idx] > delta:
-                            rb_points[(did, di, f"prm_drop{delta}")] = md_idx + 1
-
-                # PRM variant: entropy-gated
-                if lp_rec:
-                    bounds_e = step_char_bounds(d["draft_text"], steps)
-                    sm_e = compute_step_metrics(
-                        lp_rec["token_logprobs"],
-                        lp_rec["token_offsets"], bounds_e)
-                    step_ents = [sm_e[t]["mean_entropy"] for t in range(n)]
-                    mean_ent = np.mean(step_ents)
-                    if step_ents[worst_prm] > mean_ent:
-                        rb_points[(did, di, "prm_entg")] = worst_prm
-
-            # alpha-fixed baselines
+            n_i = len(d["draft_steps"])
+            for mk in method_keys:
+                a = alphas.get(mk)
+                if a is None:
+                    continue
+                rb = max(0, min(math.ceil(a * n_i), n_i - 1))
+                rb_points[(did, di, mk)] = rb
             for a in ALPHA_VALUES:
-                rb_points[(did, di, f"alpha_{a}")] = max(1, math.ceil(a * n)) - 1
-
-            # random baselines
+                mk = f"alpha_{a}"
+                rb = max(1, math.ceil(a * n_i)) - 1
+                rb_points[(did, di, mk)] = rb
             for p in RANDOM_PROBS:
-                rb = n - 1
-                for t in range(1, n):
+                mk = f"rand_{p}"
+                rb = n_i - 1
+                for t in range(1, n_i):
                     if _rng.random() < p:
                         rb = max(0, t - 1)
                         break
-                rb_points[(did, di, f"rand_{p}")] = rb
+                rb_points[(did, di, mk)] = rb
 
     # ---- Phase 3: Suffix generation (deduplicated by rollback step) --------
     done_sfx = {(r["doc_id"], r["draft_idx"], r["rollback_step"], r["suffix_idx"])
@@ -746,14 +727,6 @@ def plot_pareto(rows, out_dir, dataset="gsm8k"):
             g = "Self-Consistency"
         elif m.startswith("minlp_"):
             g = "min_logprob (argmin)"
-        elif m.startswith("prm_skip0"):
-            g = "PRM skip-step0"
-        elif m.startswith("prm_thr"):
-            g = "PRM + threshold"
-        elif m.startswith("prm_drop"):
-            g = "PRM score-drop"
-        elif m.startswith("prm_entg"):
-            g = "PRM + entropy gate"
         elif m.startswith("prm_"):
             g = "PRM (argmin)"
         elif m.startswith("alpha_"):
@@ -769,24 +742,16 @@ def plot_pareto(rows, out_dir, dataset="gsm8k"):
         "Self-Consistency": "#9E9E9E",
         "min_logprob (argmin)": "#2196F3",
         "PRM (argmin)": "#9C27B0",
-        "PRM skip-step0": "#FF9800",
-        "PRM + threshold": "#E53935",
-        "PRM score-drop": "#00BCD4",
-        "PRM + entropy gate": "#4CAF50",
-        "alpha-fixed": "#795548",
-        "random-repair": "#607D8B",
+        "alpha-fixed": "#FF9800",
+        "random-repair": "#4CAF50",
     }
     markers = {
         "Greedy": "*",
         "Self-Consistency": "D",
         "min_logprob (argmin)": "o",
         "PRM (argmin)": "P",
-        "PRM skip-step0": "^",
-        "PRM + threshold": "s",
-        "PRM score-drop": "d",
-        "PRM + entropy gate": "h",
-        "alpha-fixed": "v",
-        "random-repair": "<",
+        "alpha-fixed": "^",
+        "random-repair": "v",
     }
 
     fig, ax = plt.subplots(figsize=(10, 6))

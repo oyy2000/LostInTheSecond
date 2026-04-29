@@ -109,24 +109,40 @@ def compute_efficiency(summary: dict) -> list[dict]:
 
 
 def plot_per_dataset(ds_key: str, ds_label: str, rows: list[dict], ax):
-    """Line plot: alpha (x) vs gain_per_1k (y), one line per (nd, K)."""
+    """Line plot: alpha (x) vs gain_per_1k (y) + abs acc gain on right axis."""
     lr_rows = [r for r in rows if r.get("method") != "FullSC"]
     groups = defaultdict(list)
     for r in lr_rows:
         groups[(r["n_drafts"], r["K"])].append(r)
 
+    ax2 = ax.twinx()
+
     for (nd, K), pts in sorted(groups.items()):
         pts = sorted(pts, key=lambda x: x["alpha"])
         alphas = [p["alpha"] for p in pts]
         effs = [p["gain_per_1k"] for p in pts]
+        gains = [p["gain"] * 100 for p in pts]
         c = COLORS_ND.get(nd, "gray")
         m = MARKERS_K.get(K, "D")
         ax.plot(alphas, effs, color=c, marker=m, markersize=5,
                 lw=1.5, alpha=0.85, label=f"nd={nd}, K={K}")
+        ax2.plot(alphas, gains, color=c, marker=m, markersize=3,
+                 lw=1.0, alpha=0.35, ls="--")
+
+    sc_rows = [r for r in rows if r.get("method") == "FullSC"]
+    sc40 = [r for r in sc_rows if r["budget"] == 40]
+    if sc40:
+        sc = sc40[0]
+        ax.axhline(sc["gain_per_1k"], color="#C44E52", ls="-.", lw=1.2,
+                   alpha=0.7, label=f"SC@40 eff")
+        ax2.axhline(sc["gain"] * 100, color="#C44E52", ls=":",
+                    lw=0.8, alpha=0.4)
 
     ax.set_title(ds_label, fontsize=11, fontweight="bold")
     ax.set_xlabel(r"$\alpha$ (rollback fraction)", fontsize=9)
-    ax.set_ylabel("Acc Gain / 1k extra tokens", fontsize=9)
+    ax.set_ylabel("Eff (gain / 1k tokens)", fontsize=9)
+    ax2.set_ylabel("Abs acc gain (%)", fontsize=9, color="#888888")
+    ax2.tick_params(labelsize=7, colors="#888888")
     ax.axhline(0, color="gray", ls=":", lw=0.8)
     ax.legend(fontsize=6, loc="best", ncol=2)
     ax.grid(True, alpha=0.3)
