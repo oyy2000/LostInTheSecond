@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
 """
-Budget-controlled rollback vs from-scratch comparison.
+Budget-controlled rollback with pluggable error-step signals.
 
-Fixed total sample budget B = n_draft * n_suffix (default 32).
-Baseline: B from-scratch completions, majority vote.
-Rollback: n_draft independent sampled drafts
-          -> PRM judge finds the largest step-to-step score drop per draft
-          -> rollback to that point -> resample n_suffix suffixes per draft
-          -> majority vote over all n_draft answers + n_draft * n_suffix suffixes.
+Extends 6_6 by supporting multiple rollback signal strategies:
+  - gpt:       GPT-annotated first-error step (tau from cache)
+  - prm_drop:  first i where score[i]-score[i+1] > threshold
+               fallback to n-1 or 0 (not argmin)
+  - nll_drop:  first i where nll[i]-nll[i-1] > threshold
+               fallback to n-1 or 0 (not argmax)
 
-Configurations tested (B=32):
-  n_draft=1,  n_suffix=32
-  n_draft=2,  n_suffix=16
-  n_draft=4,  n_suffix=8
-  n_draft=8,  n_suffix=4
-  n_draft=16, n_suffix=2
+Each signal produces a rollback step per draft. Suffix generation and
+majority-vote evaluation proceed identically to 6_6.
 
 Usage:
-    python scripts/6_6_budget_controlled_rollback.py \
-        --budget 32 --gpus 0,1
+    python scripts/6_8_budget_controlled_multisignal.py \
+        --budget 32 --gpus 0,1 \
+        --signals gpt prm_drop nll_drop
 """
 
 import argparse, json, os, re, subprocess, sys, time
@@ -37,6 +34,7 @@ DATASET = "gsm8k"
 PYTHON = sys.executable
 
 PRM_DROP_THRESHOLD = 0.1
+NLL_DROP_THRESHOLD = 0.2
 TEMPERATURE = 0.7
 TOP_P = 0.95
 MAX_TOKENS = 2048
@@ -45,11 +43,16 @@ GPU_MEM = 0.85
 
 ROLLBACK_CONFIGS = [(1, 32), (2, 16), (4, 8), (8, 4), (16, 2)]
 
+ALL_SIGNALS = ["gpt", "prm_drop", "nll_drop"]
+
 from src.prompt_templates import (
     build_prompt, get_stop_tokens, split_steps,
     extract_answer, check_answer,
 )
 from src.sweep_datasets import load_dataset_by_name
+
+
+# SECTION: parse_args
 
 
 def parse_args():
@@ -59,22 +62,34 @@ def parse_args():
     ap.add_argument("--budget", type=int, default=32)
     ap.add_argument("--n-sample", type=int, default=0,
                     help="Limit questions; 0=all")
+    ap.add_argument("--signals", nargs="+",
+                    default=["gpt", "prm_drop", "nll_drop"],
+                    choices=ALL_SIGNALS,
+                    help="Which rollback signals to evaluate")
+    ap.add_argument("--prm-drop-threshold", type=float,
+                    default=PRM_DROP_THRESHOLD)
+    ap.add_argument("--nll-drop-threshold", type=float,
+                    default=NLL_DROP_THRESHOLD)
     ap.add_argument("--tag", default="")
     ap.add_argument("--out-dir", default="")
+    ap.add_argument("--gpt-cache", default="",
+                    help="Path to gpt_first_error_cache.jsonl")
     ap.add_argument("--skip-phase", type=int, nargs="*", default=[],
-                    help="Skip phases (1=drafts, 2=PRM, 3=suffix, 4=SC)")
-    # shard worker args
+                    help="Skip phases (1=drafts, 2=PRM, 3=logprob, "
+                         "4=suffix, 5=SC)")
     ap.add_argument("--_shard-id", type=int, default=-1)
     ap.add_argument("--_task-file", default="")
     ap.add_argument("--_gpu", default="0")
     ap.add_argument("--_prm", action="store_true")
+    ap.add_argument("--_logprob", action="store_true")
     return ap.parse_args()
+
 
 # SECTION: shard_worker
 
 
 def run_shard(args):
-    """Generate completions on one GPU. Handles draft/suffix/fullsc tasks."""
+    """Generate completions on one GPU."""
     os.environ["CUDA_VISIBLE_DEVICES"] = args._gpu
     from vllm import LLM, SamplingParams
 
@@ -91,16 +106,13 @@ def run_shard(args):
         enforce_eager=True,
     )
     tokenizer = llm.get_tokenizer()
-
     sp_s = SamplingParams(
         temperature=TEMPERATURE, top_p=TOP_P,
         max_tokens=MAX_TOKENS, stop=stop,
     )
-
     by_type = {}
     for i, t in enumerate(tasks):
         by_type.setdefault(t["task_type"], []).append(i)
-
     results = [None] * len(tasks)
 
     for ttype in ["draft", "suffix", "fullsc"]:
@@ -147,6 +159,7 @@ def run_shard(args):
                     f.write(json.dumps(r, ensure_ascii=False) + "\n")
     print(f"[Shard {sid}] Done: {sum(1 for r in results if r)}")
 
+
 # SECTION: prm_shard
 
 
@@ -158,13 +171,15 @@ def run_prm_shard(args):
     from transformers import AutoModel, AutoTokenizer as ATK
     from transformers import DynamicCache
     if not hasattr(DynamicCache, "get_usable_length"):
-        DynamicCache.get_usable_length = lambda self, *a, **kw: self.get_seq_length()
+        DynamicCache.get_usable_length = (
+            lambda self, *a, **kw: self.get_seq_length())
 
     tasks = json.loads(Path(args._task_file).read_text("utf-8"))
     sid = args._shard_id
     print(f"[PRM Shard {sid}] GPU {args._gpu}: {len(tasks)} tasks")
 
-    prm_tok = ATK.from_pretrained(PRM_MODEL_ID, trust_remote_code=True)
+    prm_tok = ATK.from_pretrained(
+        PRM_MODEL_ID, trust_remote_code=True)
     prm_model = AutoModel.from_pretrained(
         PRM_MODEL_ID, device_map={"": "cuda:0"},
         torch_dtype=torch.bfloat16, trust_remote_code=True,
@@ -174,7 +189,8 @@ def run_prm_shard(args):
     results = [None] * len(tasks)
     for idx, t in enumerate(tasks):
         conv = prm_tok.apply_chat_template(
-            t["prompt"], tokenize=False, add_generation_prompt=False)
+            t["prompt"], tokenize=False,
+            add_generation_prompt=False)
         input_ids = torch.tensor(
             [prm_tok.encode(conv)], dtype=torch.long,
         ).to(prm_model.device)
@@ -197,28 +213,97 @@ def run_prm_shard(args):
             for r in results:
                 if r is not None:
                     f.write(json.dumps(r, ensure_ascii=False) + "\n")
-    print(f"[PRM Shard {sid}] Done: {sum(1 for r in results if r)}")
+    print(f"[PRM Shard {sid}] Done: "
+          f"{sum(1 for r in results if r)}")
+
+
+# SECTION: logprob_shard
+
+
+def run_logprob_shard(args):
+    """Collect per-token logprobs for NLL signal."""
+    os.environ["CUDA_VISIBLE_DEVICES"] = args._gpu
+    from vllm import LLM, SamplingParams
+
+    tasks = json.loads(Path(args._task_file).read_text("utf-8"))
+    sid = args._shard_id
+    print(f"[LP Shard {sid}] GPU {args._gpu}: {len(tasks)} tasks")
+
+    llm = LLM(
+        model=MODEL_ID, tensor_parallel_size=1,
+        trust_remote_code=True, dtype="half",
+        gpu_memory_utilization=GPU_MEM,
+        max_model_len=MAX_MODEL_LEN,
+        enforce_eager=True,
+    )
+    tokenizer = llm.get_tokenizer()
+    sp = SamplingParams(
+        temperature=0.0, max_tokens=1, prompt_logprobs=1)
+    BATCH = 32
+    results = [None] * len(tasks)
+    for bi in range(0, len(tasks), BATCH):
+        batch = tasks[bi:bi + BATCH]
+        prompts = [t["full_prompt"] for t in batch]
+        outputs = llm.generate(prompts, sp)
+        for ti, (task, output) in enumerate(
+                zip(batch, outputs)):
+            rec = {k: v for k, v in task.items()
+                   if k not in ("full_prompt",)}
+            resp_off = task["resp_char_offset"]
+            lps, offsets = [], []
+            cum = 0
+            if output.prompt_logprobs is not None:
+                ptids = output.prompt_token_ids
+                for pi, lp_dict in enumerate(
+                        output.prompt_logprobs):
+                    if lp_dict is None:
+                        tok_id = ptids[pi]
+                        decoded = tokenizer.decode([tok_id])
+                        cum += len(decoded)
+                        continue
+                    tok_id = ptids[pi]
+                    if tok_id in lp_dict:
+                        lpo = lp_dict[tok_id]
+                    else:
+                        lpo = next(iter(lp_dict.values()))
+                    decoded = lpo.decoded_token or ""
+                    cpos = cum
+                    cum += len(decoded)
+                    if cpos >= resp_off:
+                        lps.append(lpo.logprob)
+                        offsets.append(cpos - resp_off)
+            rec["token_logprobs"] = lps
+            rec["token_offsets"] = offsets
+            rec["task_type"] = "logprob"
+            results[bi + ti] = rec
+        print(f"[LP Shard {sid}] batch "
+              f"{bi//BATCH+1}/{(len(tasks)+BATCH-1)//BATCH}")
+
+    out_path = Path(tasks[0]["_out"]) if tasks else None
+    if out_path:
+        with out_path.open("w") as f:
+            for r in results:
+                if r is not None:
+                    f.write(json.dumps(r, ensure_ascii=False)
+                            + "\n")
+    print(f"[LP Shard {sid}] Done: "
+          f"{sum(1 for r in results if r)}")
+
 
 # SECTION: gpu_pool
 
-
-# Minimum free GPU memory (MiB) required to launch a new shard.
-# PRM shards load a 7B model; generation shards load a 3B model.
-# 6 GiB is a safe lower bound for the smaller model.
 MIN_FREE_MEM_MIB_GEN = 6000
 MIN_FREE_MEM_MIB_PRM = 10000
-GPU_POLL_INTERVAL = 10  # seconds between availability checks
+GPU_POLL_INTERVAL = 10
 
 
 def _gpu_free_memory() -> Dict[str, int]:
-    """Return {gpu_id_str: free_MiB} for every visible GPU."""
     try:
         out = subprocess.check_output(
             ["nvidia-smi",
              "--query-gpu=index,memory.free",
              "--format=csv,noheader,nounits"],
-            text=True,
-        )
+            text=True)
     except Exception as e:
         print(f"[gpu_pool] nvidia-smi failed: {e}")
         return {}
@@ -237,17 +322,10 @@ def _wait_for_free_gpu(
     busy: Dict[str, subprocess.Popen],
     min_mem: int,
 ) -> str:
-    """Block until a GPU in *gpu_ids* has enough free memory.
-
-    Also reaps any finished processes in *busy* so the GPU is marked
-    available again.  Returns the first available gpu id.
-    """
     while True:
-        # Reap finished processes first.
         for gid in list(busy):
             if busy[gid].poll() is not None:
                 del busy[gid]
-
         free_mem = _gpu_free_memory()
         for gid in gpu_ids:
             if gid in busy:
@@ -255,21 +333,14 @@ def _wait_for_free_gpu(
             mem = free_mem.get(gid, 0)
             if mem >= min_mem:
                 return gid
-
         time.sleep(GPU_POLL_INTERVAL)
 
 
 # SECTION: launch_shards
 
 
-def launch_shards(tasks, gpu_ids, shard_dir, prm=False):
-    """Launch shard workers with GPU queuing.
-
-    Instead of launching all shards at once, this checks GPU free
-    memory before each launch.  If no GPU has enough free memory the
-    shard is queued and the function polls until a GPU becomes
-    available.
-    """
+def launch_shards(tasks, gpu_ids, shard_dir, prm=False,
+                  logprob=False):
     if not tasks:
         return []
     shard_dir.mkdir(parents=True, exist_ok=True)
@@ -279,11 +350,12 @@ def launch_shards(tasks, gpu_ids, shard_dir, prm=False):
         shards[i % ns].append(t)
 
     script = str(Path(__file__).resolve())
-    min_mem = MIN_FREE_MEM_MIB_PRM if prm else MIN_FREE_MEM_MIB_GEN
+    if prm:
+        min_mem = MIN_FREE_MEM_MIB_PRM
+    else:
+        min_mem = MIN_FREE_MEM_MIB_GEN
 
-    # busy: gpu_id -> running Popen (at most one per GPU)
     busy: Dict[str, subprocess.Popen] = {}
-    # track all launched processes for final reaping
     all_procs: List[Tuple[int, str, subprocess.Popen, Any]] = []
     out_files = []
 
@@ -302,6 +374,8 @@ def launch_shards(tasks, gpu_ids, shard_dir, prm=False):
                "--_gpu", gid, "--dataset", DATASET]
         if prm:
             cmd.append("--_prm")
+        if logprob:
+            cmd.append("--_logprob")
         env = os.environ.copy()
         env["CUDA_VISIBLE_DEVICES"] = gid
         env["TOKENIZERS_PARALLELISM"] = "false"
@@ -311,9 +385,8 @@ def launch_shards(tasks, gpu_ids, shard_dir, prm=False):
         busy[gid] = p
         all_procs.append((si, gid, p, lf))
         print(f"  Shard {si} on GPU {gid}: "
-              f"{len(shards[si])} tasks (queued/launched)")
+              f"{len(shards[si])} tasks")
 
-    # Wait for every remaining process.
     for si, gid, p, lf in all_procs:
         p.wait()
         lf.close()
@@ -333,6 +406,69 @@ def launch_shards(tasks, gpu_ids, shard_dir, prm=False):
                     recs.append(json.loads(line))
     return recs
 
+
+# SECTION: signal_computation
+
+
+def step_char_bounds(response, steps):
+    bounds, pos = [], 0
+    for s in steps:
+        idx = response.find(s, pos)
+        if idx < 0:
+            idx = pos
+        bounds.append((idx, idx + len(s)))
+        pos = idx + len(s)
+    return bounds
+
+
+def compute_step_mean_nll(lps, offs, bounds):
+    nlls = []
+    ti = 0
+    for s0, s1 in bounds:
+        while ti < len(offs) and offs[ti] < s0:
+            ti += 1
+        slps = []
+        scan = ti
+        while scan < len(offs) and offs[scan] < s1:
+            slps.append(lps[scan])
+            scan += 1
+        nlls.append(-np.mean(slps) if slps else 0.0)
+    return nlls
+
+
+def compute_rollback_step_prm_drop(scores, n, threshold):
+    """PRM-drop signal: first big drop, fallback n-1 or 0."""
+    if n < 2 or len(scores) < 2:
+        return 0, "fallback_short"
+    limit = min(len(scores), n)
+    drops = [scores[i] - scores[i + 1]
+             for i in range(limit - 1)]
+    for i, d in enumerate(drops):
+        if d > threshold:
+            return i + 1, "prm_drop"
+    return n - 1, "fallback_last"
+
+
+def compute_rollback_step_nll_drop(nlls, n, threshold):
+    """NLL-drop signal: first big NLL increase, fallback n-1 or 0."""
+    if n < 2 or len(nlls) < 2:
+        return 0, "fallback_short"
+    deltas = [nlls[i] - nlls[i - 1] for i in range(1, len(nlls))]
+    for i, d in enumerate(deltas):
+        if d > threshold:
+            return i + 1, "nll_drop"
+    return n - 1, "fallback_last"
+
+
+def compute_rollback_step_gpt(tau, n):
+    """GPT signal: tau is 1-indexed first-error step."""
+    if tau is None or tau < 1:
+        return n - 1, "gpt_missing"
+    rb = int(tau) - 1
+    rb = max(0, min(rb, n - 1))
+    return rb, "gpt"
+
+
 # SECTION: evaluation
 
 
@@ -343,16 +479,12 @@ def _vote(answers):
 
 
 def evaluate_configs(
-    questions, draft_map, prm_map, sfx_map, sc_recs, budget,
+    questions, draft_map, prm_map, sfx_map,
+    sc_recs, budget, active_signals,
 ):
-    """Evaluate all rollback configs and SC baselines.
-
-    prm_map: {(doc_id, draft_idx): {"_rb_step": int, ...}}
-    """
     nq = len(questions)
     results = []
 
-    # --- Full SC baselines ---
     sc_by_doc = defaultdict(list)
     for s in sc_recs:
         sc_by_doc[s["doc_id"]].append(s)
@@ -363,23 +495,23 @@ def evaluate_configs(
             recs = sc_by_doc.get(q["doc_id"], [])[:N]
             answers = [r["sc_answer"] for r in recs]
             toks = sum(r["sc_tokens"] for r in recs)
-            if check_answer(DATASET, _vote(answers), q["gold_answer"]):
+            if check_answer(DATASET, _vote(answers),
+                            q["gold_answer"]):
                 correct += 1
             total_toks += toks
         results.append(dict(
             method=f"SC@{N}", nd=0, ns=N,
-            acc=correct / nq, tokens_per_q=total_toks / nq,
+            acc=correct / nq,
+            tokens_per_q=total_toks / nq,
             total_tokens=total_toks,
         ))
 
-    # --- Rollback configs ---
-    # Collect all strategies present in prm_map.
     all_strategies = set()
     for prm_rec in prm_map.values():
         for strat in prm_rec.get("_rb_steps", {}):
             all_strategies.add(strat)
     if not all_strategies:
-        all_strategies = {"prm_drop"}
+        all_strategies = set(active_signals)
 
     for strat in sorted(all_strategies):
         for nd, ns in ROLLBACK_CONFIGS:
@@ -404,7 +536,6 @@ def evaluate_configs(
                     if prm_rec:
                         q_prm_toks += prm_rec.get(
                             "prm_tokens", 0)
-
                     rb_steps = (prm_rec.get("_rb_steps", {})
                                 if prm_rec else {})
                     rb_step = rb_steps.get(strat)
@@ -436,6 +567,7 @@ def evaluate_configs(
 
     return results
 
+
 # SECTION: figures
 
 import matplotlib
@@ -446,126 +578,69 @@ import matplotlib.pyplot as plt
 def make_figures(eval_results, fig_dir):
     fig_dir.mkdir(parents=True, exist_ok=True)
 
-    sc_rows = [r for r in eval_results if r["method"].startswith("SC@")]
-    rb_rows = [r for r in eval_results if r["method"].startswith("rollback_")]
+    sc_rows = [r for r in eval_results
+               if r["method"].startswith("SC@")]
+    rb_rows = [r for r in eval_results
+               if r["method"].startswith("rollback_")]
 
-    sc32 = next((r for r in sc_rows if r["method"] == "SC@32"), None)
+    sc32 = next(
+        (r for r in sc_rows if r["method"] == "SC@32"), None)
     if sc32 is None:
         return
 
     strat_colors = {
+        "gpt": "#2ecc71",
         "prm_drop": "#e74c3c",
-        "fallback_first": "#2ecc71",
-        "fallback_last": "#9b59b6",
+        "nll_drop": "#3498db",
     }
     strat_markers = {
+        "gpt": "^",
         "prm_drop": "o",
-        "fallback_first": "^",
-        "fallback_last": "D",
+        "nll_drop": "D",
     }
 
-    # --- Panel A+B: Accuracy and token savings per strategy ---
-    strategies = sorted(set(r.get("strategy", "prm_drop")
-                            for r in rb_rows))
-    for strat in strategies:
-        s_rows = sorted(
-            [r for r in rb_rows
-             if r.get("strategy", "prm_drop") == strat],
-            key=lambda r: r["nd"])
-        combined = [sc32] + s_rows
-        labels = [r["method"].replace("rollback_", "")
-                  .replace("SC@32", "SC@32\n(baseline)")
-                  for r in combined]
-        accs = [r["acc"] for r in combined]
-        base_tpq = sc32["tokens_per_q"]
-        savings = [0.0] + [
-            (1 - r["tokens_per_q"] / base_tpq) * 100
-            for r in s_rows]
-        sc = strat_colors.get(strat, "#e74c3c")
-        colors = ["#3498db"] + [sc] * len(s_rows)
+    strategies = sorted(set(
+        r.get("strategy", "prm_drop") for r in rb_rows))
 
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 4.6))
-
-        bars1 = ax1.bar(range(len(labels)), accs,
-                        color=colors, alpha=0.85,
-                        edgecolor="white", linewidth=0.5)
-        for bar, acc in zip(bars1, accs):
-            ax1.text(bar.get_x() + bar.get_width() / 2,
-                     bar.get_height() + 0.005,
-                     f"{acc:.3f}", ha="center",
-                     va="bottom", fontsize=9)
-        ax1.axhline(sc32["acc"], color="#3498db",
-                    ls="--", lw=1, alpha=0.5)
-        ax1.set_xticks(range(len(labels)))
-        ax1.set_xticklabels(labels, fontsize=8, rotation=30,
-                            ha="right")
-        ax1.set_ylabel("Majority-Vote Accuracy")
-        ax1.set_title(f"Accuracy: {strat} (B=32)")
-        ax1.spines["top"].set_visible(False)
-        ax1.spines["right"].set_visible(False)
-        ax1.set_ylim(0, max(accs) * 1.15)
-
-        bars2 = ax2.bar(range(len(labels)), savings,
-                        color=colors, alpha=0.85)
-        for bar, pct in zip(bars2, savings):
-            ax2.text(bar.get_x() + bar.get_width() / 2,
-                     bar.get_height() + 0.5,
-                     f"{pct:.1f}%", ha="center",
-                     va="bottom", fontsize=9)
-        ax2.axhline(0, color="gray", lw=0.5)
-        ax2.set_xticks(range(len(labels)))
-        ax2.set_xticklabels(labels, fontsize=8, rotation=30,
-                            ha="right")
-        ax2.set_ylabel("Token Savings vs SC@32 (%)")
-        ax2.set_title(f"Token Savings: {strat}")
-        ax2.spines["top"].set_visible(False)
-        ax2.spines["right"].set_visible(False)
-        ax2.set_ylim(
-            min(-5, min(savings) - 5),
-            max(savings) * 1.15 if max(savings) > 0 else 5)
-
-        plt.tight_layout()
-        for ext in ["pdf", "png"]:
-            fig.savefig(
-                fig_dir / f"fig_acc_savings_{strat}.{ext}",
-                dpi=150, bbox_inches="tight")
-        plt.close(fig)
-
-    # --- Figure: Efficiency frontier ---
     fig, ax = plt.subplots(1, 1, figsize=(8, 5.5))
     for r in sc_rows:
-        ax.scatter(r["tokens_per_q"], r["acc"], c="#3498db", s=60,
-                   marker="s", zorder=5, edgecolors="white", lw=0.5)
-        ax.annotate(r["method"], (r["tokens_per_q"], r["acc"]),
-                    textcoords="offset points", xytext=(6, 4), fontsize=7)
-    plotted_strats = set()
+        ax.scatter(r["tokens_per_q"], r["acc"],
+                   c="#888888", s=60, marker="s",
+                   zorder=5, edgecolors="white", lw=0.5)
+        ax.annotate(r["method"],
+                    (r["tokens_per_q"], r["acc"]),
+                    textcoords="offset points",
+                    xytext=(6, 4), fontsize=7)
+    plotted = set()
     for r in rb_rows:
         strat = r.get("strategy", "prm_drop")
         c = strat_colors.get(strat, "#e74c3c")
         m = strat_markers.get(strat, "o")
-        label = strat if strat not in plotted_strats else None
-        plotted_strats.add(strat)
+        label = strat if strat not in plotted else None
+        plotted.add(strat)
         ax.scatter(r["tokens_per_q"], r["acc"], c=c, s=80,
                    marker=m, zorder=5, edgecolors="white",
                    lw=0.5, label=label)
         short = r["method"].replace("rollback_", "")
         ax.annotate(short, (r["tokens_per_q"], r["acc"]),
-                    textcoords="offset points", xytext=(6, 4),
-                    fontsize=7)
+                    textcoords="offset points",
+                    xytext=(6, 4), fontsize=7)
+
     for strat in strategies:
         s_rows = sorted(
             [r for r in rb_rows
-             if r.get("strategy", "prm_drop") == strat],
+             if r.get("strategy") == strat],
             key=lambda r: r["tokens_per_q"])
         if len(s_rows) > 1:
             rx = [r["tokens_per_q"] for r in s_rows]
             ry = [r["acc"] for r in s_rows]
             c = strat_colors.get(strat, "#e74c3c")
             ax.plot(rx, ry, "--", color=c, alpha=0.4, lw=1)
+
     ax.legend(fontsize=8, loc="best")
     ax.set_xlabel("Tokens per Question")
     ax.set_ylabel("Majority-Vote Accuracy")
-    ax.set_title("Efficiency Frontier: Accuracy vs Token Cost")
+    ax.set_title("Efficiency Frontier: Multi-Signal")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     plt.tight_layout()
@@ -573,13 +648,13 @@ def make_figures(eval_results, fig_dir):
         fig.savefig(fig_dir / f"fig_efficiency_frontier.{ext}",
                     dpi=150, bbox_inches="tight")
     plt.close(fig)
-
     print(f"Figures saved to {fig_dir}")
 
 
 def save_summary_table(eval_results, out_dir):
     out_dir.mkdir(parents=True, exist_ok=True)
-    sc32 = next((r for r in eval_results if r["method"] == "SC@32"), None)
+    sc32 = next((r for r in eval_results
+                 if r["method"] == "SC@32"), None)
     if sc32 is None:
         return
     base_tpq = sc32["tokens_per_q"]
@@ -596,18 +671,22 @@ def save_summary_table(eval_results, out_dir):
             "savings_vs_sc32": savings,
         })
 
-    md_lines = [
-        "| method | strategy | nd | ns | acc | tokens_per_q | savings_vs_sc32 |",
+    md = [
+        "| method | strategy | nd | ns | acc "
+        "| tokens_per_q | savings_vs_sc32 |",
         "|---|---|---:|---:|---:|---:|---:|",
     ]
     for r in rows:
-        md_lines.append(
-            f"| {r['method']} | {r['strategy']} | {r['nd']} | {r['ns']} | "
-            f"{r['acc']:.4f} | {r['tokens_per_q']:.1f} | "
-            f"{r['savings_vs_sc32']:.1f}% |"
+        md.append(
+            f"| {r['method']} | {r['strategy']} "
+            f"| {r['nd']} | {r['ns']} "
+            f"| {r['acc']:.4f} | {r['tokens_per_q']:.1f} "
+            f"| {r['savings_vs_sc32']:.1f}% |"
         )
-    (out_dir / "eval_summary_table.md").write_text("\n".join(md_lines), encoding="utf-8")
+    (out_dir / "eval_summary_table.md").write_text(
+        "\n".join(md), encoding="utf-8")
     print(f"Saved table: {out_dir / 'eval_summary_table.md'}")
+
 
 # SECTION: main
 
@@ -620,20 +699,25 @@ def main():
     if args._shard_id >= 0:
         if args._prm:
             run_prm_shard(args)
+        elif args._logprob:
+            run_logprob_shard(args)
         else:
             run_shard(args)
         return
 
-    gpu_ids = [g.strip() for g in args.gpus.split(",") if g.strip()]
+    signals = args.signals
+    prm_thr = args.prm_drop_threshold
+    nll_thr = args.nll_drop_threshold
+
+    gpu_ids = [g.strip() for g in args.gpus.split(",")
+               if g.strip()]
     B = args.budget
-    nd_max = max(nd for nd, ns in ROLLBACK_CONFIGS if nd * ns == B)
-    ns_max = max(ns for nd, ns in ROLLBACK_CONFIGS if nd * ns == B)
+    nd_max = max(nd for nd, ns in ROLLBACK_CONFIGS
+                 if nd * ns == B)
+    ns_max = max(ns for nd, ns in ROLLBACK_CONFIGS
+                 if nd * ns == B)
     sc_n = B
 
-    # Per-draft suffix budget: for each draft_idx, the max ns across
-    # all configs that use that draft.
-    # e.g. draft 0 is used by all configs -> max ns = 32
-    #      draft 1 is used by nd>=2       -> max ns = 16
     ns_for_draft = {}
     for di in range(nd_max):
         ns_for_draft[di] = max(
@@ -643,140 +727,232 @@ def main():
 
     suffix = f"_{args.tag}" if args.tag else ""
     out_dir = Path(args.out_dir) if args.out_dir else (
-        PROJECT_ROOT / "results" / f"{DATASET}_budget_controlled{suffix}")
+        PROJECT_ROOT / "results"
+        / f"{DATASET}_budget_multisignal{suffix}")
     out_dir.mkdir(parents=True, exist_ok=True)
-    fig_dir = PROJECT_ROOT / "figures" / f"budget_controlled{suffix}"
+    fig_dir = (PROJECT_ROOT / "figures"
+               / f"budget_multisignal{suffix}")
     ckpt = out_dir / "checkpoint.jsonl"
     sd = out_dir / "_shards"
 
-    questions = load_dataset_by_name(DATASET, args.n_sample, seed=42)
+    questions = load_dataset_by_name(
+        DATASET, args.n_sample, seed=42)
     nq = len(questions)
     q_map = {q["doc_id"]: q for q in questions}
-    print(f"Dataset: {DATASET}, {nq} questions, GPUs: {gpu_ids}")
-    print(f"Budget B={B}, nd_max={nd_max}, ns_max={ns_max}")
-    print(f"  Per-draft suffix budget: { {di: ns_for_draft[di] for di in sorted(ns_for_draft)} }")
+    print(f"Dataset: {DATASET}, {nq} questions, "
+          f"GPUs: {gpu_ids}")
+    print(f"Budget B={B}, signals={signals}")
 
     existing = []
     if ckpt.exists():
-        existing = [json.loads(l) for l in ckpt.read_text().splitlines()
+        existing = [json.loads(l)
+                    for l in ckpt.read_text().splitlines()
                     if l.strip()]
     print(f"Existing checkpoint: {len(existing)} records")
 
-    # ---- Phase 1: Sample nd_max independent drafts per question ----
+    # ---- Phase 1: Sample drafts ----
     if 1 not in args.skip_phase:
-        done_drafts = {(r["doc_id"], r["draft_idx"])
-                       for r in existing if r.get("task_type") == "draft"}
-        draft_tasks = []
+        done = {(r["doc_id"], r["draft_idx"])
+                for r in existing
+                if r.get("task_type") == "draft"}
+        tasks = []
         for q in questions:
-            p = build_prompt(MODEL_ID, DATASET, q["question"])
+            p = build_prompt(MODEL_ID, DATASET,
+                             q["question"])
             for di in range(nd_max):
-                if (q["doc_id"], di) in done_drafts:
+                if (q["doc_id"], di) in done:
                     continue
-                draft_tasks.append(dict(
-                    task_type="draft", doc_id=q["doc_id"],
-                    draft_idx=di, gold_answer=q["gold_answer"],
+                tasks.append(dict(
+                    task_type="draft",
+                    doc_id=q["doc_id"],
+                    draft_idx=di,
+                    gold_answer=q["gold_answer"],
                     prompt=p,
                 ))
-        if draft_tasks:
-            print(f"\n--- Phase 1: {len(draft_tasks)} drafts ---")
-            new = launch_shards(draft_tasks, gpu_ids, sd / "p1")
+        if tasks:
+            print(f"\n--- Phase 1: {len(tasks)} drafts ---")
+            new = launch_shards(tasks, gpu_ids, sd / "p1")
             with ckpt.open("a") as f:
                 for r in new:
-                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
+                    f.write(json.dumps(r, ensure_ascii=False)
+                            + "\n")
             existing.extend(new)
 
-    drafts = [r for r in existing if r.get("task_type") == "draft"]
-    draft_map = {(r["doc_id"], r["draft_idx"]): r for r in drafts}
+    drafts = [r for r in existing
+              if r.get("task_type") == "draft"]
+    draft_map = {(r["doc_id"], r["draft_idx"]): r
+                 for r in drafts}
     print(f"Total drafts: {len(drafts)}")
 
-    # ---- Phase 2: PRM scoring on all drafts ----
-    if 2 not in args.skip_phase:
-        done_prm = {(r["doc_id"], r.get("draft_idx", 0))
-                    for r in existing if r.get("task_type") == "prm"}
+    # ---- Phase 2: PRM scoring (if prm_drop in signals) ----
+    need_prm = "prm_drop" in signals
+    if need_prm and 2 not in args.skip_phase:
+        done = {(r["doc_id"], r.get("draft_idx", 0))
+                for r in existing
+                if r.get("task_type") == "prm"}
         prm_tasks = []
         for q in questions:
             for di in range(nd_max):
-                if (q["doc_id"], di) in done_prm:
+                if (q["doc_id"], di) in done:
                     continue
                 d = draft_map.get((q["doc_id"], di))
                 if not d or not d.get("draft_steps"):
                     continue
                 steps = d["draft_steps"]
-                step_text = "<extra_0>".join(steps) + "<extra_0>"
+                step_text = ("<extra_0>".join(steps)
+                             + "<extra_0>")
                 messages = [
-                    {"role": "system", "content":
-                     "Please reason step by step, and put your final "
-                     "answer within \\boxed{}."},
-                    {"role": "user", "content": q["question"]},
-                    {"role": "assistant", "content": step_text},
+                    {"role": "system",
+                     "content": "Please reason step by step, "
+                     "and put your final answer within "
+                     "\\boxed{}."},
+                    {"role": "user",
+                     "content": q["question"]},
+                    {"role": "assistant",
+                     "content": step_text},
                 ]
                 prm_tasks.append(dict(
-                    task_type="prm", doc_id=q["doc_id"],
-                    draft_idx=di, n_steps=len(steps),
+                    task_type="prm",
+                    doc_id=q["doc_id"],
+                    draft_idx=di,
+                    n_steps=len(steps),
                     prompt=messages,
                 ))
         if prm_tasks:
-            print(f"\n--- Phase 2: {len(prm_tasks)} PRM scorings ---")
-            new = launch_shards(prm_tasks, gpu_ids, sd / "p2", prm=True)
+            print(f"\n--- Phase 2: {len(prm_tasks)} PRM ---")
+            new = launch_shards(
+                prm_tasks, gpu_ids, sd / "p2", prm=True)
             with ckpt.open("a") as f:
                 for r in new:
-                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
+                    f.write(json.dumps(r, ensure_ascii=False)
+                            + "\n")
             existing.extend(new)
 
-    prm_recs = [r for r in existing if r.get("task_type") == "prm"]
+    prm_recs = [r for r in existing
+                if r.get("task_type") == "prm"]
     prm_map = {}
     for r in prm_recs:
         prm_map[(r["doc_id"], r.get("draft_idx", 0))] = r
     print(f"Total PRM records: {len(prm_recs)}")
 
-    # ---- Compute rollback points from PRM score drops ----
-    # For each draft, _rb_steps is a dict {strategy_name: step_index}.
-    # - "prm_drop": only when max drop > threshold
-    # - "fallback_first" / "fallback_last": when no significant drop
+    # ---- Phase 3: Logprob collection (if nll_drop) ----
+    need_lp = "nll_drop" in signals
+    if need_lp and 3 not in args.skip_phase:
+        done = {(r["doc_id"], r.get("draft_idx", 0))
+                for r in existing
+                if r.get("task_type") == "logprob"}
+        lp_tasks = []
+        for q in questions:
+            for di in range(nd_max):
+                if (q["doc_id"], di) in done:
+                    continue
+                d = draft_map.get((q["doc_id"], di))
+                if not d or not d.get("draft_steps"):
+                    continue
+                p = build_prompt(MODEL_ID, DATASET,
+                                 q["question"])
+                full = p + d["draft_text"]
+                lp_tasks.append(dict(
+                    task_type="logprob",
+                    doc_id=q["doc_id"],
+                    draft_idx=di,
+                    full_prompt=full,
+                    resp_char_offset=len(p),
+                    n_steps=d.get("n_steps", 0),
+                ))
+        if lp_tasks:
+            print(f"\n--- Phase 3: {len(lp_tasks)} "
+                  f"logprob ---")
+            new = launch_shards(
+                lp_tasks, gpu_ids, sd / "p3",
+                logprob=True)
+            with ckpt.open("a") as f:
+                for r in new:
+                    f.write(json.dumps(r, ensure_ascii=False)
+                            + "\n")
+            existing.extend(new)
+
+    lp_recs = [r for r in existing
+               if r.get("task_type") == "logprob"]
+    lp_map = {(r["doc_id"], r.get("draft_idx", 0)): r
+              for r in lp_recs}
+    print(f"Total logprob records: {len(lp_recs)}")
+
+    # ---- Load GPT cache (if gpt in signals) ----
+    gpt_map = {}
+    if "gpt" in signals:
+        gpt_path = args.gpt_cache
+        if not gpt_path:
+            gpt_path = str(
+                PROJECT_ROOT / "results"
+                / f"{DATASET}_3b_multi_sample"
+                / "first_error"
+                / "gpt_first_error_cache.jsonl")
+        gp = Path(gpt_path)
+        if gp.exists():
+            gpt_recs = [json.loads(l)
+                        for l in gp.read_text().splitlines()
+                        if l.strip()]
+            for r in gpt_recs:
+                gpt_map[(f"{DATASET}_{r['doc_id']}",
+                         r["sample_idx"])] = r
+            print(f"GPT cache: {len(gpt_recs)} entries")
+        else:
+            print(f"GPT cache not found: {gp}")
+
+    # ---- Compute rollback points per signal ----
     for q in questions:
         for di in range(nd_max):
             d = draft_map.get((q["doc_id"], di))
             prm_rec = prm_map.get((q["doc_id"], di))
-            if not d or not prm_rec:
+            if not d:
                 continue
-            scores = prm_rec.get("step_scores", [])
             n = d.get("n_steps", 0)
-            if n < 2 or len(scores) < 2:
-                prm_rec["_rb_steps"] = {
-                    "fallback_first": 0,
-                    "fallback_last": max(n - 1, 1),
-                }
-                prm_rec["_rb_signal"] = "fallback_short"
-                prm_rec["_rb_drop"] = None
-                continue
+            if prm_rec is None:
+                prm_rec = {"doc_id": q["doc_id"],
+                           "draft_idx": di}
+                prm_map[(q["doc_id"], di)] = prm_rec
 
-            limit = min(len(scores), n)
-            drops = [scores[i] - scores[i + 1] for i in range(limit - 1)]
-            if drops:
-                md_idx = int(np.argmax(drops))
-                max_drop = float(drops[md_idx])
-                if max_drop > PRM_DROP_THRESHOLD:
-                    prm_rec["_rb_steps"] = {
-                        "prm_drop": md_idx + 1,
-                    }
-                    prm_rec["_rb_signal"] = "prm_drop"
-                    prm_rec["_rb_drop"] = max_drop
-                    continue
+            rb_steps = {}
 
-            prm_rec["_rb_steps"] = {
-                "fallback_first": 0,
-                "fallback_last": max(n - 1, 1),
-            }
-            prm_rec["_rb_signal"] = "fallback"
-            prm_rec["_rb_drop"] = (
-                float(max(drops)) if drops else None)
+            if "prm_drop" in signals:
+                scores = prm_rec.get("step_scores", [])
+                rb, sig = compute_rollback_step_prm_drop(
+                    scores, n, prm_thr)
+                rb_steps["prm_drop"] = rb
 
-    # ---- Phase 3: Suffix generation ----
-    if 3 not in args.skip_phase:
-        done_sfx = {(r["doc_id"], r["draft_idx"],
-                     r.get("strategy", "prm_drop"),
-                     r["rollback_step"], r["suffix_idx"])
-                    for r in existing if r.get("task_type") == "suffix"}
+            if "nll_drop" in signals:
+                lp_rec = lp_map.get((q["doc_id"], di))
+                if lp_rec and d.get("draft_steps"):
+                    bounds = step_char_bounds(
+                        d["draft_text"], d["draft_steps"])
+                    nlls = compute_step_mean_nll(
+                        lp_rec["token_logprobs"],
+                        lp_rec["token_offsets"], bounds)
+                    rb, sig = compute_rollback_step_nll_drop(
+                        nlls, n, nll_thr)
+                    rb_steps["nll_drop"] = rb
+                else:
+                    rb_steps["nll_drop"] = max(n - 1, 0)
+
+            if "gpt" in signals:
+                g = gpt_map.get((q["doc_id"], di))
+                tau = g.get("tau") if g else None
+                rb, sig = compute_rollback_step_gpt(tau, n)
+                rb_steps["gpt"] = rb
+
+            prm_rec["_rb_steps"] = rb_steps
+
+    # ---- Phase 4: Suffix generation ----
+    if 4 not in args.skip_phase:
+        done_sfx = set()
+        for r in existing:
+            if r.get("task_type") == "suffix":
+                done_sfx.add((
+                    r["doc_id"], r["draft_idx"],
+                    r.get("strategy", "prm_drop"),
+                    r["rollback_step"],
+                    r["suffix_idx"]))
         sfx_tasks = []
         for q in questions:
             did = q["doc_id"]
@@ -796,7 +972,8 @@ def main():
                     if b == 0:
                         prefix = ""
                     else:
-                        prefix = "\n\n".join(steps[:b]) + "\n\n"
+                        prefix = ("\n\n".join(steps[:b])
+                                  + "\n\n")
                     p = build_prompt(
                         MODEL_ID, DATASET, q["question"])
                     p += prefix
@@ -815,64 +992,78 @@ def main():
                             prompt=p,
                         ))
         if sfx_tasks:
-            print(f"\n--- Phase 3: {len(sfx_tasks)} suffix generations ---")
-            new = launch_shards(sfx_tasks, gpu_ids, sd / "p3")
+            print(f"\n--- Phase 4: {len(sfx_tasks)} "
+                  f"suffix generations ---")
+            new = launch_shards(
+                sfx_tasks, gpu_ids, sd / "p4")
             with ckpt.open("a") as f:
                 for r in new:
-                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
+                    f.write(json.dumps(r, ensure_ascii=False)
+                            + "\n")
             existing.extend(new)
 
-    sfx_recs = [r for r in existing if r.get("task_type") == "suffix"]
+    sfx_recs = [r for r in existing
+                if r.get("task_type") == "suffix"]
     sfx_map = {}
     for s in sfx_recs:
-        sfx_map[(s["doc_id"], s["draft_idx"], s.get("strategy", "prm_drop"),
+        sfx_map[(s["doc_id"], s["draft_idx"],
+                 s.get("strategy", "prm_drop"),
                  s["rollback_step"], s["suffix_idx"])] = s
     print(f"Total suffix records: {len(sfx_recs)}")
 
-    # ---- Phase 4: Full SC baseline ----
-    if 4 not in args.skip_phase:
+    # ---- Phase 5: Full SC baseline ----
+    if 5 not in args.skip_phase:
         done_sc = {(r["doc_id"], r["sc_idx"])
-                   for r in existing if r.get("task_type") == "fullsc"}
+                   for r in existing
+                   if r.get("task_type") == "fullsc"}
         sc_tasks = []
         for q in questions:
-            p = build_prompt(MODEL_ID, DATASET, q["question"])
+            p = build_prompt(MODEL_ID, DATASET,
+                             q["question"])
             for si in range(sc_n):
                 if (q["doc_id"], si) in done_sc:
                     continue
                 sc_tasks.append(dict(
-                    task_type="fullsc", doc_id=q["doc_id"],
-                    sc_idx=si, gold_answer=q["gold_answer"],
+                    task_type="fullsc",
+                    doc_id=q["doc_id"],
+                    sc_idx=si,
+                    gold_answer=q["gold_answer"],
                     prompt=p,
                 ))
         if sc_tasks:
-            print(f"\n--- Phase 4: {len(sc_tasks)} SC samples ---")
-            new = launch_shards(sc_tasks, gpu_ids, sd / "p4")
+            print(f"\n--- Phase 5: {len(sc_tasks)} SC ---")
+            new = launch_shards(
+                sc_tasks, gpu_ids, sd / "p5")
             with ckpt.open("a") as f:
                 for r in new:
-                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
+                    f.write(json.dumps(r, ensure_ascii=False)
+                            + "\n")
             existing.extend(new)
 
-    sc_recs = [r for r in existing if r.get("task_type") == "fullsc"]
+    sc_recs = [r for r in existing
+               if r.get("task_type") == "fullsc"]
     print(f"Total SC records: {len(sc_recs)}")
 
     # ---- Evaluate ----
     print("\n--- Evaluation ---")
     eval_results = evaluate_configs(
-        questions, draft_map, prm_map, sfx_map, sc_recs, B)
+        questions, draft_map, prm_map, sfx_map,
+        sc_recs, B, signals)
 
-    print(f"\n{'Method':<25} {'Acc':>8} {'Tok/Q':>10} {'TotalTok':>12}")
-    print("-" * 58)
+    print(f"\n{'Method':<35} {'Acc':>8} "
+          f"{'Tok/Q':>10} {'TotalTok':>12}")
+    print("-" * 68)
     for r in eval_results:
-        print(f"{r['method']:<25} {r['acc']:>8.4f} "
-              f"{r['tokens_per_q']:>10.0f} {r['total_tokens']:>12,}")
+        print(f"{r['method']:<35} {r['acc']:>8.4f} "
+              f"{r['tokens_per_q']:>10.0f} "
+              f"{r['total_tokens']:>12,}")
 
-    # ---- Save ----
     summary_path = out_dir / "eval_summary.json"
     summary_path.write_text(
-        json.dumps(eval_results, indent=2, ensure_ascii=False))
+        json.dumps(eval_results, indent=2,
+                   ensure_ascii=False))
     print(f"\nSaved: {summary_path}")
 
-    # ---- Figures + table ----
     make_figures(eval_results, fig_dir)
     save_summary_table(eval_results, out_dir)
     print("Done.")
