@@ -9,11 +9,17 @@ Pipeline:
   Phase 4: Full SC baseline
   Evaluate: acc vs total tokens (logprob cost included)
 
-Trigger modes:
+Trigger modes (after slimming):
   - min_logprob (lookback): fire when min_logprob < threshold -> repair prev step
-  - PRM: rollback to the first step where PRM score drops a lot to find the alpha for future draft
+  - mean_nll: rollback to step with highest mean NLL (= lowest mean logprob)
+  - PRM threshold: rollback to first step with PRM score < threshold,
+                    fallback to alpha=0.8 position if none qualifies
   - alpha-fixed (baseline): rollback at fixed fraction alpha
   - random: fire with probability p at each step
+
+Two evaluation views are produced:
+  (A) including PRM scoring tokens in PRM cost
+  (B) excluding PRM scoring tokens (assume PRM is "free" / amortized)
 
 Usage:
     python scripts/6_1_entropy_triggered_sweep.py --gpus 0,1
@@ -47,7 +53,7 @@ DATASET = "gsm8k"
 PYTHON = "/common/users/sl2148/anaconda3/envs/vllmdebug/bin/python"
 
 # -- defaults ---------------------------------------------------------------
-ND_MAX = 4
+ND_MAX = 8
 K_MAX = 3
 FULLSC_N = 40
 TEMPERATURE = 0.7
@@ -60,6 +66,8 @@ BATCH_PER_GPU = 256
 # -- baseline sweep values ---------------------------------------------------
 ALPHA_VALUES = [0.3, 0.5, 0.7]
 RANDOM_PROBS = [0.10, 0.20, 0.30]
+PRM_THRESHOLD = 0.1       # rollback to first step with PRM score < threshold
+PRM_FALLBACK_ALPHA = 0.8  # if no step below threshold, rollback at this fraction
 
 
 def parse_args():
@@ -70,6 +78,7 @@ def parse_args():
     ap.add_argument("--k-max", type=int, default=K_MAX)
     ap.add_argument("--fullsc-n", type=int, default=FULLSC_N)
     ap.add_argument("--n-sample", type=int, default=0)
+    ap.add_argument("--tag", default="", help="version tag appended to output dirs")
     ap.add_argument("--out-dir", default="")
     ap.add_argument("--_shard-id", type=int, default=-1)
     ap.add_argument("--_task-file", default="")
@@ -155,8 +164,11 @@ def run_shard(args):
             chunk = lp_idxs[bi:bi + IBATCH]
             pids = [tokenizer.encode(tasks[i]["prompt"],
                                      add_special_tokens=False) for i in chunk]
+            _lp_t0 = time.perf_counter()
             outs = llm.generate([{"prompt_token_ids": p} for p in pids],
                                 sampling_params=sp_lp)
+            _lp_wall_ms = (time.perf_counter() - _lp_t0) * 1000.0
+            _lp_per_sample = _lp_wall_ms / max(len(chunk), 1)
             for idx, o in zip(chunk, outs):
                 t = tasks[idx]
                 resp_off = t["resp_char_offset"]
@@ -177,7 +189,8 @@ def run_shard(args):
                             offs.append(cpos - resp_off)
                 rec = {k: t[k] for k in t if k != "prompt"}
                 rec.update(token_logprobs=lps, token_offsets=offs,
-                           logprob_prompt_tokens=len(o.prompt_token_ids))
+                           logprob_prompt_tokens=len(o.prompt_token_ids),
+                           logprob_overhead_ms=round(_lp_per_sample, 3))
                 results[idx] = rec
             print(f"[Shard {sid}] logprob batch {bi//IBATCH+1}/{(len(lp_idxs)+IBATCH-1)//IBATCH}")
 
@@ -213,6 +226,7 @@ def run_prm_shard(args):
 
     results = [None] * len(tasks)
     for idx, t in enumerate(tasks):
+        _prm_t0 = time.perf_counter()
         conv = prm_tok.apply_chat_template(
             t["prompt"], tokenize=False,
             add_generation_prompt=False)
@@ -229,6 +243,9 @@ def run_prm_shard(args):
         scores = pos.cpu().tolist()
         rec = {k: t[k] for k in t if k != "prompt"}
         rec["step_scores"] = [round(s, 6) for s in scores]
+        rec["prm_tokens"] = int(input_ids.shape[1])
+        rec["prm_overhead_ms"] = round(
+            (time.perf_counter() - _prm_t0) * 1000.0, 3)
         results[idx] = rec
 
     out_path = Path(tasks[0]["_out"]) if tasks else None
@@ -344,8 +361,14 @@ def _vote(answers):
     return Counter(answers).most_common(1)[0][0]
 
 
-def evaluate_all(questions, drafts, logprob_recs, suffix_recs, sc_recs, rb_points, args, se_recs=None):
-    """Evaluate all methods and return list of (method, tokens_per_q, acc)."""
+def evaluate_all(questions, drafts, logprob_recs, suffix_recs, sc_recs,
+                 rb_points, args, se_recs=None, count_prm_tokens=True):
+    """Evaluate all methods and return list of (method, tokens_per_q, acc, overhead_ms_per_q).
+
+    count_prm_tokens:
+        If True,  PRM scoring cost is added to PRM-based methods.
+        If False, PRM is treated as "free" (e.g. amortized / external).
+    """
     q_map = {q["doc_id"]: q for q in questions}
     nq = len(questions)
 
@@ -358,6 +381,20 @@ def evaluate_all(questions, drafts, logprob_recs, suffix_recs, sc_recs, rb_point
     lp_map = {}
     for r in logprob_recs:
         lp_map[(r["doc_id"], r.get("draft_idx", 0))] = r
+
+    # organize PRM tokens by (doc_id, draft_idx)
+    prm_tok_map = {}
+    prm_ms_map = {}
+    if se_recs:
+        for r in se_recs:
+            key = (r["doc_id"], r.get("draft_idx", 0))
+            prm_tok_map[key] = r.get("prm_tokens", 0)
+            prm_ms_map[key] = r.get("prm_overhead_ms", 0.0)
+
+    # organize logprob overhead_ms by (doc_id, draft_idx)
+    lp_ms_map = {}
+    for r in logprob_recs:
+        lp_ms_map[(r["doc_id"], r.get("draft_idx", 0))] = r.get("logprob_overhead_ms", 0.0)
 
     # organize suffixes by (doc_id, draft_idx, rollback_step, suffix_idx)
     sfx_map = {}
@@ -375,7 +412,7 @@ def evaluate_all(questions, drafts, logprob_recs, suffix_recs, sc_recs, rb_point
         if d and check_answer(DATASET, d["draft_answer"], q["gold_answer"]):
             correct += 1
         total_toks += d["draft_tokens"] if d else 0
-    results.append(("greedy", total_toks / nq, correct / nq))
+    results.append(("greedy", total_toks / nq, correct / nq, 0.0))
 
     # --- Full SC baselines ---
     sc_by_doc = {}
@@ -391,17 +428,13 @@ def evaluate_all(questions, drafts, logprob_recs, suffix_recs, sc_recs, rb_point
             if check_answer(DATASET, _vote(answers), q["gold_answer"]):
                 correct += 1
             total_toks += toks
-        results.append((f"SC@{N}", total_toks / nq, correct / nq))
+        results.append((f"SC@{N}", total_toks / nq, correct / nq, 0.0))
 
     # --- Triggered rollback methods ---
-    nd_vals = [1, 2]
+    nd_vals = sorted(set([1, 2, 4, 8, 16]) & set(range(1, args.nd_max + 1)))
     k_vals = [2, 3]
 
-    all_mkeys = ["minlp", "prm", "prm_skip0", "prm_entg"]
-    for thr in [0.7]:
-        all_mkeys.append(f"prm_thr{thr}")
-    for delta in [0.3]:
-        all_mkeys.append(f"prm_drop{delta}")
+    all_mkeys = ["minlp", "mean_nll", "prm_thr"]
     for a in ALPHA_VALUES:
         all_mkeys.append(f"alpha_{a}")
     for p in RANDOM_PROBS:
@@ -416,10 +449,12 @@ def evaluate_all(questions, drafts, logprob_recs, suffix_recs, sc_recs, rb_point
                     continue
                 correct = 0
                 total_toks = 0
+                total_overhead_ms = 0.0
                 for q in questions:
                     did = q["doc_id"]
                     answers = []
                     q_toks = 0
+                    q_overhead_ms = 0.0
 
                     for di in range(nd):
                         d = draft_map.get((did, di))
@@ -427,11 +462,17 @@ def evaluate_all(questions, drafts, logprob_recs, suffix_recs, sc_recs, rb_point
                             continue
                         answers.append(d["draft_answer"])
                         q_toks += d["draft_tokens"]
-                        if mkey in ("minlp", "prm", "prm_skip0", "prm_entg") or \
-                                mkey.startswith("prm_thr") or mkey.startswith("prm_drop"):
+                        # Scoring cost depends on the trigger
+                        if mkey in ("minlp", "mean_nll"):
                             lp_rec = lp_map.get((did, di))
                             if lp_rec:
                                 q_toks += lp_rec["logprob_prompt_tokens"]
+                                q_overhead_ms += lp_ms_map.get((did, di), 0.0)
+                        elif mkey == "prm_thr":
+                            if count_prm_tokens:
+                                q_toks += prm_tok_map.get((did, di), 0)
+                            q_overhead_ms += prm_ms_map.get((did, di), 0.0)
+                        # alpha_* and rand_* incur no scoring cost
                         rb = rb_points.get((did, di, mkey))
                         if rb is not None:
                             for si in range(K - 1):
@@ -442,8 +483,10 @@ def evaluate_all(questions, drafts, logprob_recs, suffix_recs, sc_recs, rb_point
                     if check_answer(DATASET, _vote(answers), q["gold_answer"]):
                         correct += 1
                     total_toks += q_toks
+                    total_overhead_ms += q_overhead_ms
                 label = f"{mkey}_nd{nd}_K{K}"
-                results.append((label, total_toks / nq, correct / nq))
+                results.append((label, total_toks / nq, correct / nq,
+                                round(total_overhead_ms / nq, 3)))
 
     return results
 
@@ -464,8 +507,9 @@ def main():
     gpu_ids = [g.strip() for g in args.gpus.split(",") if g.strip()]
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
+    suffix = f"_{args.tag}" if args.tag else ""
     out_dir = Path(args.out_dir) if args.out_dir else (
-        ROOT / "results" / f"{DATASET}_entropy_triggered_sweep")
+        ROOT / "results" / f"{DATASET}_entropy_triggered_sweep{suffix}")
     out_dir.mkdir(parents=True, exist_ok=True)
     ckpt = out_dir / "checkpoint.jsonl"
     sd = out_dir / "_shards"
@@ -600,52 +644,30 @@ def main():
                 worst_lp = min(range(n), key=lambda t: sm[t]["min_logprob"])
                 rb_points[(did, di, "minlp")] = worst_lp
 
-            # PRM: argmin over this draft's PRM scores
+                # mean_nll: argmax NLL_t = argmin mean_logprob over steps
+                worst_mean = min(range(n), key=lambda t: sm[t]["mean_logprob"])
+                rb_points[(did, di, "mean_nll")] = worst_mean
+
+            # PRM threshold: rollback to first step with score < PRM_THRESHOLD;
+            # if none qualifies, fallback to the PRM_FALLBACK_ALPHA position
             se_scores = se_by_draft.get((did, di), [])
-            if se_scores and len(se_scores) >= n:
-                worst_prm = min(range(n), key=lambda t: se_scores[t])
-                rb_points[(did, di, "prm")] = worst_prm
-
-                # PRM variant: skip step 0
-                worst_skip0 = min(range(1, n), key=lambda t: se_scores[t])
-                rb_points[(did, di, "prm_skip0")] = worst_skip0
-
-                # PRM variant: threshold gating
-                for thr in [0.7]:
-                    if se_scores[worst_prm] < thr:
-                        rb_points[(did, di, f"prm_thr{thr}")] = worst_prm
-
-                # PRM variant: score drop
-                prm_drops = [se_scores[i] - se_scores[i + 1]
-                             for i in range(n - 1)]
-                if prm_drops:
-                    md_idx = int(np.argmax(prm_drops))
-                    for delta in [0.3]:
-                        if prm_drops[md_idx] > delta:
-                            rb_points[(did, di, f"prm_drop{delta}")] = md_idx + 1
-
-                # PRM variant: entropy-gated
-                if lp_rec:
-                    bounds_e = step_char_bounds(d["draft_text"], steps)
-                    sm_e = compute_step_metrics(
-                        lp_rec["token_logprobs"],
-                        lp_rec["token_offsets"], bounds_e)
-                    step_ents = [sm_e[t]["mean_entropy"] for t in range(n)]
-                    mean_ent = np.mean(step_ents)
-                    if step_ents[worst_prm] > mean_ent:
-                        rb_points[(did, di, "prm_entg")] = worst_prm
+            if se_scores and len(se_scores) >= n and n >= 2:
+                rb_step = None
+                for si_idx in range(n):
+                    if se_scores[si_idx] < PRM_THRESHOLD:
+                        rb_step = si_idx
+                        break
+                if rb_step is None:
+                    rb_step = max(1, math.ceil(PRM_FALLBACK_ALPHA * n)) - 1
+                rb_points[(did, di, "prm_thr")] = rb_step
 
             # alpha-fixed baselines
             for a in ALPHA_VALUES:
                 rb_points[(did, di, f"alpha_{a}")] = max(1, math.ceil(a * n)) - 1
 
-            # random baselines
+            # random-uniform baselines: uniformly sample a rollback prefix length
             for p in RANDOM_PROBS:
-                rb = n - 1
-                for t in range(1, n):
-                    if _rng.random() < p:
-                        rb = max(0, t - 1)
-                        break
+                rb = _rng.randint(1, n - 1)
                 rb_points[(did, di, f"rand_{p}")] = rb
 
     # ---- Phase 3: Suffix generation (deduplicated by rollback step) --------
@@ -711,32 +733,92 @@ def main():
     sc_recs = [r for r in existing if r.get("task_type") == "fullsc"]
     print(f"Total SC records: {len(sc_recs)}")
 
-    # ---- Evaluate ---------------------------------------------------------
-    print("\n--- Evaluation ---")
+    # ---- Evaluate (two views) ---------------------------------------------
+    print("\n--- Evaluation (with PRM tokens) ---")
     t0 = time.time()
-    results = evaluate_all(questions, drafts, lp_recs, sfx_recs, sc_recs, rb_points, args, se_recs)
-    print(f"Evaluation done in {time.time()-t0:.1f}s, {len(results)} configs")
+    res_with = evaluate_all(questions, drafts, lp_recs, sfx_recs, sc_recs,
+                            rb_points, args, se_recs, count_prm_tokens=True)
+    print(f"Done in {time.time()-t0:.1f}s, {len(res_with)} configs")
+
+    print("\n--- Evaluation (without PRM tokens) ---")
+    t0 = time.time()
+    res_no = evaluate_all(questions, drafts, lp_recs, sfx_recs, sc_recs,
+                          rb_points, args, se_recs, count_prm_tokens=False)
+    print(f"Done in {time.time()-t0:.1f}s, {len(res_no)} configs")
+
+    # ---- Overhead wall-time summary ----------------------------------------
+    print("\n--- Scoring overhead wall-time (ms per question) ---")
+    for label, _, _, overhead in res_with:
+        if overhead > 0:
+            print(f"  {label:40s}  {overhead:10.1f} ms/q")
+    lp_all_ms = [r.get("logprob_overhead_ms", 0.0) for r in lp_recs if r.get("logprob_overhead_ms")]
+    prm_all_ms = [r.get("prm_overhead_ms", 0.0) for r in se_recs if r.get("prm_overhead_ms")]
+    if lp_all_ms:
+        print(f"  [logprob per-sample]  mean={np.mean(lp_all_ms):.1f}  "
+              f"median={np.median(lp_all_ms):.1f}  p95={np.percentile(lp_all_ms,95):.1f} ms")
+    if prm_all_ms:
+        print(f"  [PRM per-sample]      mean={np.mean(prm_all_ms):.1f}  "
+              f"median={np.median(prm_all_ms):.1f}  p95={np.percentile(prm_all_ms,95):.1f} ms")
 
     # ---- Save & Plot ------------------------------------------------------
-    rows = [{"method": m, "tokens_per_q": t, "acc": a} for m, t, a in results]
-    res_path = out_dir / "sweep_results.json"
-    res_path.write_text(json.dumps(rows, indent=2), encoding="utf-8")
-    print(f"Results -> {res_path}")
+    rows_with = [{"method": m, "tokens_per_q": t, "acc": a,
+                  "overhead_ms_per_q": o} for m, t, a, o in res_with]
+    rows_no   = [{"method": m, "tokens_per_q": t, "acc": a,
+                  "overhead_ms_per_q": o} for m, t, a, o in res_no]
 
-    plot_pareto(rows, out_dir, dataset=DATASET)
+    (out_dir / "sweep_results_with_prm.json").write_text(
+        json.dumps(rows_with, indent=2), encoding="utf-8")
+    (out_dir / "sweep_results_no_prm.json").write_text(
+        json.dumps(rows_no, indent=2), encoding="utf-8")
+    # also keep the legacy filename pointing at the "with PRM" view
+    (out_dir / "sweep_results.json").write_text(
+        json.dumps(rows_with, indent=2), encoding="utf-8")
+    print(f"Results -> {out_dir}/sweep_results_{{with_prm,no_prm}}.json")
+
+    plot_pareto(rows_with, out_dir, dataset=DATASET,
+                tag=suffix + "_with_prm",
+                subtitle="PRM scoring tokens INCLUDED")
+    plot_pareto(rows_no, out_dir, dataset=DATASET,
+                tag=suffix + "_no_prm",
+                subtitle="PRM scoring tokens EXCLUDED")
     print("Done.")
 
 
 # ---- plotting -------------------------------------------------------------
 
-def plot_pareto(rows, out_dir, dataset="gsm8k"):
+def _sc_curve(rows):
+    """Return sorted list of (tokens_per_q, acc) for SC@N points."""
+    sc_pts = sorted(
+        (r["tokens_per_q"], r["acc"]) for r in rows if r["method"].startswith("SC@")
+    )
+    return sc_pts
+
+
+def _sc_acc_at(sc_pts, tokens):
+    """Linearly interpolate SC accuracy at a given token budget; clamp to ends."""
+    if not sc_pts:
+        return None
+    if tokens <= sc_pts[0][0]:
+        return sc_pts[0][1]
+    if tokens >= sc_pts[-1][0]:
+        return sc_pts[-1][1]
+    for i in range(len(sc_pts) - 1):
+        x0, y0 = sc_pts[i]
+        x1, y1 = sc_pts[i + 1]
+        if x0 <= tokens <= x1:
+            return y0 + (y1 - y0) * (tokens - x0) / (x1 - x0)
+    return sc_pts[-1][1]
+
+
+def plot_pareto(rows, out_dir, dataset="gsm8k", tag="", subtitle=""):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig_dir = ROOT / "figures" / "entropy_triggered_sweep"
+    fig_dir = ROOT / "figures" / f"entropy_triggered_sweep{tag}"
     fig_dir.mkdir(parents=True, exist_ok=True)
 
+    # --- group classification (slimmed: only PRM score-drop kept) ---
     groups = {}
     for r in rows:
         m = r["method"]
@@ -746,16 +828,10 @@ def plot_pareto(rows, out_dir, dataset="gsm8k"):
             g = "Self-Consistency"
         elif m.startswith("minlp_"):
             g = "min_logprob (argmin)"
-        elif m.startswith("prm_skip0"):
-            g = "PRM skip-step0"
+        elif m.startswith("mean_nll_"):
+            g = "mean_NLL (step-avg)"
         elif m.startswith("prm_thr"):
-            g = "PRM + threshold"
-        elif m.startswith("prm_drop"):
-            g = "PRM score-drop"
-        elif m.startswith("prm_entg"):
-            g = "PRM + entropy gate"
-        elif m.startswith("prm_"):
-            g = "PRM (argmin)"
+            g = "PRM threshold"
         elif m.startswith("alpha_"):
             g = "alpha-fixed"
         elif m.startswith("rand_"):
@@ -768,11 +844,8 @@ def plot_pareto(rows, out_dir, dataset="gsm8k"):
         "Greedy": "#333333",
         "Self-Consistency": "#9E9E9E",
         "min_logprob (argmin)": "#2196F3",
-        "PRM (argmin)": "#9C27B0",
-        "PRM skip-step0": "#FF9800",
-        "PRM + threshold": "#E53935",
-        "PRM score-drop": "#00BCD4",
-        "PRM + entropy gate": "#4CAF50",
+        "mean_NLL (step-avg)": "#4CAF50",
+        "PRM threshold": "#00BCD4",
         "alpha-fixed": "#795548",
         "random-repair": "#607D8B",
     }
@@ -780,34 +853,43 @@ def plot_pareto(rows, out_dir, dataset="gsm8k"):
         "Greedy": "*",
         "Self-Consistency": "D",
         "min_logprob (argmin)": "o",
-        "PRM (argmin)": "P",
-        "PRM skip-step0": "^",
-        "PRM + threshold": "s",
-        "PRM score-drop": "d",
-        "PRM + entropy gate": "h",
+        "mean_NLL (step-avg)": "s",
+        "PRM threshold": "d",
         "alpha-fixed": "v",
         "random-repair": "<",
     }
 
+    # =====================================================================
+    # Plot 1: Pareto (acc vs tokens), with SC drawn as a connected curve
+    # =====================================================================
     fig, ax = plt.subplots(figsize=(10, 6))
     for g, pts in groups.items():
         xs = [p["tokens_per_q"] / 1000 for p in pts]
         ys = [p["acc"] * 100 for p in pts]
         ax.scatter(xs, ys, label=g, color=colors.get(g, "#666"),
                    marker=markers.get(g, "o"), s=40, alpha=0.7)
-        paired = sorted(zip(xs, ys))
-        front_x, front_y = [paired[0][0]], [paired[0][1]]
-        for x, y in paired[1:]:
-            if y >= front_y[-1]:
-                front_x.append(x)
-                front_y.append(y)
-        if len(front_x) > 1:
-            ax.plot(front_x, front_y, color=colors.get(g, "#666"),
-                    linewidth=1.5, alpha=0.5)
+        if g == "Self-Consistency":
+            paired = sorted(zip(xs, ys))
+            ax.plot([x for x, _ in paired], [y for _, y in paired],
+                    color=colors[g], linewidth=2.0, alpha=0.7,
+                    linestyle="-", label="_nolegend_")
+        else:
+            paired = sorted(zip(xs, ys))
+            front_x, front_y = [paired[0][0]], [paired[0][1]]
+            for x, y in paired[1:]:
+                if y >= front_y[-1]:
+                    front_x.append(x)
+                    front_y.append(y)
+            if len(front_x) > 1:
+                ax.plot(front_x, front_y, color=colors.get(g, "#666"),
+                        linewidth=1.0, alpha=0.4, linestyle=":")
 
     ax.set_xlabel("Tokens per question (x1000)")
     ax.set_ylabel("Accuracy (%)")
-    ax.set_title("Qwen2.5-3B-Instruct on GSM8K: Acc vs Compute")
+    title = "Qwen2.5-3B-Instruct on GSM8K: Acc vs Compute"
+    if subtitle:
+        title += f"\n[{subtitle}]"
+    ax.set_title(title)
     ax.legend(fontsize=8, loc="lower right")
     ax.grid(alpha=0.3)
     fig.tight_layout()
@@ -816,31 +898,76 @@ def plot_pareto(rows, out_dir, dataset="gsm8k"):
     plt.close(fig)
     print(f"Pareto figure -> {fig_dir}")
 
-    # acc gain / 1k tokens efficiency plot
-    greedy_acc = next((p["acc"] for p in rows if p["method"] == "greedy"), 0)
+    # =====================================================================
+    # Plot 2: Accuracy improvement vs Full SC at the SAME token budget
+    #         (interpolated SC curve as the per-cost baseline)
+    # =====================================================================
+    sc_pts = _sc_curve(rows)
     fig2, ax2 = plt.subplots(figsize=(10, 6))
     for g, pts in groups.items():
-        if g == "Greedy":
+        if g in ("Self-Consistency",):
             continue
         xs = [p["tokens_per_q"] / 1000 for p in pts]
-        ys = [(p["acc"] - greedy_acc) * 100 / max(p["tokens_per_q"] / 1000, 0.01)
-              for p in pts]
-        ax2.scatter(xs, ys, label=g, color=colors.get(g, "#666"),
-                    marker=markers.get(g, "o"), s=40, alpha=0.7)
-    ax2.axhline(0, color="gray", linewidth=0.5, linestyle="--")
+        gains = []
+        for p in pts:
+            sc_a = _sc_acc_at(sc_pts, p["tokens_per_q"])
+            if sc_a is None:
+                gains.append(0.0)
+            else:
+                gains.append((p["acc"] - sc_a) * 100)
+        ax2.scatter(xs, gains, label=g, color=colors.get(g, "#666"),
+                    marker=markers.get(g, "o"), s=40, alpha=0.8)
+    ax2.axhline(0, color="gray", linewidth=1.0, linestyle="--",
+                label="Full SC (interpolated)")
     ax2.set_xlabel("Tokens per question (x1000)")
-    ax2.set_ylabel("Acc gain per 1k tokens (pp)")
-    ax2.set_title("Qwen2.5-3B-Instruct on GSM8K: Efficiency (Acc Gain / 1k tokens)")
-    ax2.legend(fontsize=8, loc="upper right")
+    ax2.set_ylabel("Accuracy improvement vs Full SC (pp)")
+    title2 = "Acc improvement over Full SC at same token budget"
+    if subtitle:
+        title2 += f"\n[{subtitle}]"
+    ax2.set_title(title2)
+    ax2.legend(fontsize=8, loc="best")
     ax2.grid(alpha=0.3)
     fig2.tight_layout()
     for fmt in ("png", "pdf"):
-        fig2.savefig(fig_dir / f"fig_efficiency_{dataset}.{fmt}", dpi=200)
+        fig2.savefig(fig_dir / f"fig_acc_gain_vs_sc_{dataset}.{fmt}", dpi=200)
     plt.close(fig2)
-    print(f"Efficiency figure -> {fig_dir}")
+    print(f"Gain-vs-SC figure -> {fig_dir}")
+
+    # =====================================================================
+    # Plot 3: Acc gain (vs Full SC) per 1k tokens — efficiency view
+    # =====================================================================
+    fig3, ax3 = plt.subplots(figsize=(10, 6))
+    for g, pts in groups.items():
+        if g in ("Self-Consistency",):
+            continue
+        xs = [p["tokens_per_q"] / 1000 for p in pts]
+        eff = []
+        for p in pts:
+            sc_a = _sc_acc_at(sc_pts, p["tokens_per_q"])
+            if sc_a is None:
+                eff.append(0.0)
+            else:
+                eff.append((p["acc"] - sc_a) * 100 /
+                           max(p["tokens_per_q"] / 1000, 0.01))
+        ax3.scatter(xs, eff, label=g, color=colors.get(g, "#666"),
+                    marker=markers.get(g, "o"), s=40, alpha=0.8)
+    ax3.axhline(0, color="gray", linewidth=1.0, linestyle="--",
+                label="Full SC (interpolated)")
+    ax3.set_xlabel("Tokens per question (x1000)")
+    ax3.set_ylabel("Acc gain vs Full SC per 1k tokens (pp / 1k tok)")
+    title3 = "Efficiency: acc gain over Full SC per 1k tokens"
+    if subtitle:
+        title3 += f"\n[{subtitle}]"
+    ax3.set_title(title3)
+    ax3.legend(fontsize=8, loc="best")
+    ax3.grid(alpha=0.3)
+    fig3.tight_layout()
+    for fmt in ("png", "pdf"):
+        fig3.savefig(fig_dir / f"fig_efficiency_vs_sc_{dataset}.{fmt}", dpi=200)
+    plt.close(fig3)
+    print(f"Efficiency-vs-SC figure -> {fig_dir}")
 
 
 if __name__ == "__main__":
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     main()
-

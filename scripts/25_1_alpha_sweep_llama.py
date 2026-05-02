@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.sweep_engine import SweepConfig, run_shard, run_sweep
 
-MODEL = "Qwen/Qwen2.5-3B-Instruct" # "Qwen/Qwen2.5-3B-Instruct"
+MODEL = "Qwen/Qwen2.5-3B-Instruct" # "Qwen/Qwen2.5-3B-Instruct" meta-llama/Llama-3.2-3B-Instruct
 DATASETS = [
    "gsm8k", "math500", "hotpotqa", "aime2024", "amc2023", "olympiadbench", "humaneval"
 ]

@@ -69,3 +69,4 @@ hendrycks_math_nvidia_model_test/
 
 # LlamaFactory (submodule)
 LlamaFactory/
+third_party/

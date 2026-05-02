@@ -1,24 +1,335 @@
 #!/usr/bin/env python3
 """
-Combined analysis: Bad-prefix recovery vs Minimal repair.
+Experiment: Compare rollback resample vs from-scratch resample (majority vote).
 
-Computes and visualizes:
-  - R_bad(early), R_bad(late)
-  - R_fix(early), R_fix(late)
-  - Delta_fix(early), Delta_fix(late)
-  - Breakdown by individual tau values
+Two conditions for each wrong trajectory with known first-error step tau:
+  - R_rollback: keep prefix up to step tau-1 (before the error), continue N times,
+                majority vote.  Reuses 6_5 (rollback_one_step) output.
+  - R_scratch:  generate N fresh completions from scratch, majority vote.
 
-Requires outputs from 6_1 and 6_3.
+Multi-GPU data-parallel for the from-scratch generation.
 
 Usage:
-    python scripts/6_4_compare_bad_vs_repair.py
+    python scripts/6_4_compare_bad_vs_repair.py \
+        --rollback-file results/gsm8k_3b_multi_sample/rollback_one_step/continuations.jsonl \
+        --early-file results/gsm8k_3b_multi_sample/first_error/bucket_early.json \
+        --late-file results/gsm8k_3b_multi_sample/first_error/bucket_late.json \
+        --out-dir results/gsm8k_3b_multi_sample/rollback_vs_scratch \
+        --n-continuations 32 \
+        --gpus 0,1,2,3,4,5,6,7
 """
 
 import argparse
 import json
+import os
+import re
+import subprocess
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
+from typing import Any, Dict, List
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+MODEL_ID = "Qwen/Qwen2.5-3B-Instruct"
+SYSTEM_PROMPT = "Please reason step by step, and put your final answer within \\boxed{}."
+
+# SECTION: args
+
+
+def parse_args() -> argparse.Namespace:
+    ap = argparse.ArgumentParser(
+        description="Compare rollback resample vs from-scratch resample (majority vote)")
+    ap.add_argument("--rollback-file", default=str(
+        PROJECT_ROOT / "results/gsm8k_3b_multi_sample/rollback_one_step/continuations.jsonl"),
+        help="Continuations from 6_5 (rollback one step recovery)")
+    ap.add_argument("--early-file", default=str(
+        PROJECT_ROOT / "results/gsm8k_3b_multi_sample/first_error/bucket_early.json"))
+    ap.add_argument("--late-file", default=str(
+        PROJECT_ROOT / "results/gsm8k_3b_multi_sample/first_error/bucket_late.json"))
+    ap.add_argument("--out-dir", default=str(
+        PROJECT_ROOT / "results/gsm8k_3b_multi_sample/rollback_vs_scratch"))
+    ap.add_argument("--fig-dir", default=str(
+        PROJECT_ROOT / "figures/rollback_vs_scratch"))
+    ap.add_argument("--model-id", default=MODEL_ID)
+    ap.add_argument("--n-continuations", type=int, default=32)
+    ap.add_argument("--temperature", type=float, default=0.7)
+    ap.add_argument("--top-p", type=float, default=0.9)
+    ap.add_argument("--max-tokens", type=int, default=2048)
+    ap.add_argument("--gpus", default="0,1,2,3,4,5,6,7")
+    ap.add_argument("--gpu-memory-utilization", type=float, default=0.90)
+    ap.add_argument("--max-model-len", type=int, default=2048)
+    ap.add_argument("--limit", type=int, default=0, help="Limit samples per bucket; 0=all")
+    ap.add_argument("--skip-generation", action="store_true",
+                    help="Skip from-scratch generation; use existing scratch file")
+    # Internal shard worker args
+    ap.add_argument("--_shard-id", type=int, default=-1, help=argparse.SUPPRESS)
+    ap.add_argument("--_n-shards", type=int, default=-1, help=argparse.SUPPRESS)
+    ap.add_argument("--_shard-out", default="", help=argparse.SUPPRESS)
+    ap.add_argument("--_gpu-id", default="0", help=argparse.SUPPRESS)
+    ap.add_argument("--_task-file", default="", help=argparse.SUPPRESS)
+    return ap.parse_args()
+
+# SECTION: helpers
+
+
+def build_chat_prompt(question: str) -> str:
+    return (
+        f"<|im_start|>system\n{SYSTEM_PROMPT}\n<|im_end|>\n"
+        f"<|im_start|>user\n{question.strip()}\n<|im_end|>\n"
+        f"<|im_start|>assistant\n"
+    )
+
+
+def extract_boxed_answer(text: str) -> str:
+    idx = (text or "").rfind("\\boxed")
+    if idx < 0:
+        return ""
+    i, depth, start = idx, 0, None
+    while i < len(text):
+        if text[i] == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0 and start is not None:
+                return text[start + 1 : i].strip()
+        i += 1
+    return ""
+
+
+def normalize_answer(text: str) -> str:
+    text = (text or "").strip().replace("$", "").replace(",", "")
+    text = re.sub(r"\\boxed\{(.*)\}", r"\1", text)
+    text = re.sub(r"\s+", "", text)
+    return text.lower()
+
+# SECTION: majority_vote
+
+
+def majority_vote(pred_answers: List[str]) -> str:
+    """Return the most common normalized answer among predictions."""
+    normed = [normalize_answer(a) for a in pred_answers if normalize_answer(a)]
+    if not normed:
+        return ""
+    return Counter(normed).most_common(1)[0][0]
+
+
+def load_samples(early_file: str, late_file: str, limit: int) -> List[Dict[str, Any]]:
+    samples = []
+    for path_str in [early_file, late_file]:
+        path = Path(path_str)
+        if not path.exists():
+            print(f"WARNING: {path} not found, skipping")
+            continue
+        data = json.loads(path.read_text("utf-8"))
+        samples.extend(data)
+    if limit > 0:
+        early = [s for s in samples if s["bucket"] == "early"][:limit]
+        late = [s for s in samples if s["bucket"] == "late"][:limit]
+        samples = early + late
+    return samples
+
+# SECTION: shard_worker
+
+
+def run_shard(args) -> None:
+    """Generate from-scratch completions on a single GPU."""
+    os.environ["CUDA_VISIBLE_DEVICES"] = args._gpu_id
+    from vllm import LLM, SamplingParams
+
+    task_file = Path(args._task_file)
+    tasks = json.loads(task_file.read_text("utf-8"))
+    print(f"[Shard {args._shard_id}] GPU {args._gpu_id}: {len(tasks)} prompts")
+
+    sampling_params = SamplingParams(
+        temperature=args.temperature,
+        top_p=args.top_p,
+        max_tokens=args.max_tokens,
+        stop=["<|im_end|>", "<|endoftext|>"],
+    )
+    llm = LLM(
+        model=args.model_id,
+        tensor_parallel_size=1,
+        trust_remote_code=True,
+        gpu_memory_utilization=args.gpu_memory_utilization,
+        max_model_len=args.max_model_len,
+        dtype="half",
+    )
+
+    prompts = [t["prompt"] for t in tasks]
+    outputs = llm.generate(prompts, sampling_params)
+
+    out_path = Path(args._shard_out)
+    with out_path.open("w", encoding="utf-8") as fout:
+        for task, output in zip(tasks, outputs):
+            full_response = output.outputs[0].text.strip()
+            pred_answer = extract_boxed_answer(full_response)
+            gold = task["gold_answer"]
+            is_correct = float(
+                normalize_answer(pred_answer) == normalize_answer(gold)
+            ) if gold else 0.0
+            rec = {
+                "doc_id": task["doc_id"],
+                "sample_idx": task["sample_idx"],
+                "continuation_idx": task["continuation_idx"],
+                "bucket": task["bucket"],
+                "tau": task["tau"],
+                "n_steps": task["n_steps"],
+                "gold_answer": gold,
+                "pred_answer": pred_answer,
+                "exact_match": is_correct,
+                "source": "scratch",
+            }
+            fout.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+    print(f"[Shard {args._shard_id}] Done -> {out_path}")
+
+# SECTION: generation
+
+
+def generate_scratch_completions(args, samples, out_dir: Path) -> Path:
+    """Generate from-scratch completions via multi-GPU sharding."""
+    gpu_ids = [g.strip() for g in args.gpus.split(",") if g.strip()]
+    n_shards = len(gpu_ids)
+
+    all_tasks = []
+    for s in samples:
+        prompt = build_chat_prompt(s["question"])
+        for ci in range(args.n_continuations):
+            all_tasks.append({
+                "doc_id": s["doc_id"],
+                "sample_idx": s["sample_idx"],
+                "continuation_idx": ci,
+                "bucket": s["bucket"],
+                "tau": s["tau"],
+                "n_steps": s["n_steps"],
+                "gold_answer": s["gold_answer"],
+                "prompt": prompt,
+            })
+
+    print(f"From-scratch generation: {len(all_tasks)} prompts across {n_shards} GPUs")
+
+    shard_dir = out_dir / "_shards_scratch"
+    shard_dir.mkdir(parents=True, exist_ok=True)
+
+    shard_tasks = [[] for _ in range(n_shards)]
+    for i, task in enumerate(all_tasks):
+        shard_tasks[i % n_shards].append(task)
+
+    script_path = str(Path(__file__).resolve())
+    procs = []
+    shard_out_files = []
+
+    for si, gpu_id in enumerate(gpu_ids):
+        task_file = shard_dir / f"tasks_{si}.json"
+        task_file.write_text(
+            json.dumps(shard_tasks[si], ensure_ascii=False), encoding="utf-8")
+        shard_out = shard_dir / f"shard_{si}.jsonl"
+        shard_out_files.append(shard_out)
+
+        cmd = [
+            sys.executable, script_path,
+            "--model-id", args.model_id,
+            "--temperature", str(args.temperature),
+            "--top-p", str(args.top_p),
+            "--max-tokens", str(args.max_tokens),
+            "--gpu-memory-utilization", str(args.gpu_memory_utilization),
+            "--max-model-len", str(args.max_model_len),
+            "--_shard-id", str(si),
+            "--_n-shards", str(n_shards),
+            "--_shard-out", str(shard_out),
+            "--_gpu-id", gpu_id,
+            "--_task-file", str(task_file),
+        ]
+        env = os.environ.copy()
+        env["CUDA_VISIBLE_DEVICES"] = gpu_id
+        env["TOKENIZERS_PARALLELISM"] = "false"
+
+        print(f"  Launching shard {si} on GPU {gpu_id} "
+              f"({len(shard_tasks[si])} prompts)...")
+        log_file = shard_dir / f"log_{si}.txt"
+        log_fh = log_file.open("w", encoding="utf-8")
+        p = subprocess.Popen(
+            cmd, env=env, stdout=log_fh, stderr=subprocess.STDOUT)
+        procs.append((si, gpu_id, p, log_fh))
+
+    failed = []
+    for si, gpu_id, p, log_fh in procs:
+        p.wait()
+        log_fh.close()
+        rc = p.returncode
+        log_path = shard_dir / f"log_{si}.txt"
+        output_text = log_path.read_text("utf-8", errors="replace")
+        lines = output_text.strip().splitlines()
+        tail = "\n".join(lines[-5:]) if lines else "(no output)"
+        print(f"\n--- Shard {si} (GPU {gpu_id}) exit={rc} ---\n{tail}")
+        if rc != 0:
+            failed.append(si)
+            if len(lines) > 5:
+                print("...\n" + "\n".join(lines[-20:]))
+        else:
+            log_path.unlink(missing_ok=True)
+
+    if failed:
+        print(f"\nERROR: Shards {failed} failed!")
+        sys.exit(1)
+
+    merged_path = out_dir / "scratch_continuations.jsonl"
+    n_total = 0
+    with merged_path.open("w", encoding="utf-8") as fout:
+        for sf in shard_out_files:
+            if sf.exists():
+                for line in sf.read_text("utf-8").splitlines():
+                    if line.strip():
+                        fout.write(line + "\n")
+                        n_total += 1
+
+    print(f"Merged: {n_total} scratch continuations -> {merged_path}")
+
+    for sf in shard_out_files:
+        sf.unlink(missing_ok=True)
+    for si in range(n_shards):
+        tf = shard_dir / f"tasks_{si}.json"
+        tf.unlink(missing_ok=True)
+    shard_dir.rmdir()
+
+    return merged_path
+
+# SECTION: analysis
+
+
+def compute_majority_vote_accuracy(
+    rows: List[Dict], n_continuations: int
+) -> Dict[tuple, Dict]:
+    """Group by (doc_id, sample_idx), majority-vote, return per-sample result."""
+    by_sample: Dict[tuple, List[Dict]] = defaultdict(list)
+    for r in rows:
+        key = (r["doc_id"], r["sample_idx"])
+        by_sample[key].append(r)
+
+    results = {}
+    for key, recs in by_sample.items():
+        pred_answers = [r["pred_answer"] for r in recs]
+        mv_answer = majority_vote(pred_answers)
+        gold = normalize_answer(recs[0]["gold_answer"])
+        correct = 1.0 if (mv_answer and mv_answer == gold) else 0.0
+        results[key] = {
+            "mv_correct": correct,
+            "mv_answer": mv_answer,
+            "n_continuations": len(recs),
+            "bucket": recs[0]["bucket"],
+            "tau": recs[0]["tau"],
+            "n_steps": recs[0]["n_steps"],
+            "gold_answer": recs[0]["gold_answer"],
+            "per_cont_rate": sum(
+                1 for r in recs if r["exact_match"] >= 1.0) / len(recs),
+        }
+    return results
+
+# SECTION: figures
 
 import matplotlib
 matplotlib.use("Agg")
@@ -26,437 +337,302 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats as sp_stats
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-
-def parse_args() -> argparse.Namespace:
-    ap = argparse.ArgumentParser(description="Compare bad-prefix vs minimal repair")
-    ap.add_argument("--bad-file", default=str(
-        PROJECT_ROOT / "results/gsm8k_3b_multi_sample/bad_prefix_recovery/continuations.jsonl"))
-    ap.add_argument("--fix-file", default=str(
-        PROJECT_ROOT / "results/gsm8k_3b_multi_sample/minimal_repair/continuations.jsonl"))
-    ap.add_argument("--fig-dir", default=str(
-        PROJECT_ROOT / "figures/bad_prefix_recovery"))
-    ap.add_argument("--out-summary", default=str(
-        PROJECT_ROOT / "results/gsm8k_3b_multi_sample/repair_gain_summary.json"))
-    ap.add_argument("--per-question", action="store_true",
-                    help="Aggregate by doc_id (question) instead of (doc_id, sample_idx)")
-    return ap.parse_args()
-
-
-def load_per_sample_rates(path: Path) -> dict:
-    """Load continuations and compute per-(doc_id, sample_idx) recovery rate."""
-    rows = [json.loads(l) for l in path.read_text("utf-8").splitlines() if l.strip()]
-    by_sample = defaultdict(list)
-    for r in rows:
-        key = (r["doc_id"], r["sample_idx"])
-        by_sample[key].append(r)
-
-    sample_rates = {}
-    for key, recs in by_sample.items():
-        n_correct = sum(1 for r in recs if r["exact_match"] >= 1.0)
-        sample_rates[key] = {
-            "rate": n_correct / len(recs),
-            "bucket": recs[0]["bucket"],
-            "tau": recs[0]["tau"],
-            "n_steps": recs[0]["n_steps"],
-            "n_total": len(recs),
-        }
-    return sample_rates
-
-
-def load_per_question_rates(path: Path) -> dict:
-    """Load continuations and compute per-doc_id (question-level) recovery rate.
-
-    All continuations across all sample_idx for the same doc_id are pooled.
-    Bucket and tau are taken as the mode across samples for that question.
-    """
-    rows = [json.loads(l) for l in path.read_text("utf-8").splitlines() if l.strip()]
-    by_doc = defaultdict(list)
-    for r in rows:
-        by_doc[r["doc_id"]].append(r)
-
-    question_rates = {}
-    for doc_id, recs in by_doc.items():
-        n_correct = sum(1 for r in recs if r["exact_match"] >= 1.0)
-        buckets = [r["bucket"] for r in recs]
-        taus = [r["tau"] for r in recs]
-        n_steps_list = [r["n_steps"] for r in recs]
-        question_rates[doc_id] = {
-            "rate": n_correct / len(recs),
-            "bucket": max(set(buckets), key=buckets.count),
-            "tau": int(np.median(taus)),
-            "n_steps": int(np.median(n_steps_list)),
-            "n_total": len(recs),
-        }
-    return question_rates
-
-
-def main():
-    args = parse_args()
-    fig_dir = Path(args.fig_dir)
+def make_figures(paired, fig_dir: Path):
+    """Generate comparison figures."""
     fig_dir.mkdir(parents=True, exist_ok=True)
 
-    bad_path = Path(args.bad_file)
-    fix_path = Path(args.fix_file)
-
-    for p, name in [(bad_path, "bad-prefix"), (fix_path, "minimal-repair")]:
-        if not p.exists():
-            print(f"ERROR: {name} file not found: {p}")
-            sys.exit(1)
-
-    bad_rates = load_per_sample_rates(bad_path) if not args.per_question else load_per_question_rates(bad_path)
-    fix_rates = load_per_sample_rates(fix_path) if not args.per_question else load_per_question_rates(fix_path)
-    granularity = "per-question" if args.per_question else "per-sample"
-    fig_suffix = "_perq" if args.per_question else ""
-    print(f"Granularity: {granularity}")
-    print(f"Bad-prefix items: {len(bad_rates)}")
-    print(f"Fix items: {len(fix_rates)}")
-
-    # Match samples present in both
-    common_keys = set(bad_rates.keys()) & set(fix_rates.keys())
-    print(f"Common samples: {len(common_keys)}")
-
-    # Build paired data
-    paired = []
-    for key in common_keys:
-        if args.per_question:
-            doc_id, sample_idx = key, None
-        else:
-            doc_id, sample_idx = key[0], key[1]
-        paired.append({
-            "doc_id": doc_id,
-            "sample_idx": sample_idx,
-            "bucket": bad_rates[key]["bucket"],
-            "tau": bad_rates[key]["tau"],
-            "n_steps": bad_rates[key]["n_steps"],
-            "r_bad": bad_rates[key]["rate"],
-            "r_fix": fix_rates[key]["rate"],
-            "delta": fix_rates[key]["rate"] - bad_rates[key]["rate"],
-        })
-
-    # Aggregate by bucket
     by_bucket = defaultdict(list)
     for p in paired:
         by_bucket[p["bucket"]].append(p)
 
-    print("\n=== Results by bucket ===")
     summary = {}
     for bucket in ["early", "late"]:
         items = by_bucket[bucket]
         if not items:
             continue
-        r_bad = np.array([x["r_bad"] for x in items])
-        r_fix = np.array([x["r_fix"] for x in items])
-        delta = np.array([x["delta"] for x in items])
+        r_rep = np.array([x["mv_repair"] for x in items])
+        r_scr = np.array([x["mv_scratch"] for x in items])
         n = len(items)
-
         summary[bucket] = {
             "n": n,
-            "r_bad_mean": float(np.mean(r_bad)),
-            "r_bad_se": float(np.std(r_bad) / np.sqrt(n)),
-            "r_fix_mean": float(np.mean(r_fix)),
-            "r_fix_se": float(np.std(r_fix) / np.sqrt(n)),
-            "delta_mean": float(np.mean(delta)),
-            "delta_se": float(np.std(delta) / np.sqrt(n)),
+            "rollback_mean": float(np.mean(r_rep)),
+            "rollback_se": float(np.std(r_rep) / np.sqrt(n)),
+            "scratch_mean": float(np.mean(r_scr)),
+            "scratch_se": float(np.std(r_scr) / np.sqrt(n)),
+            "delta_mean": float(np.mean(r_scr - r_rep)),
+            "delta_se": float(np.std(r_scr - r_rep) / np.sqrt(n)),
         }
-        # Paired t-test for delta > 0
-        t_stat, p_val = sp_stats.ttest_1samp(delta, 0)
-        summary[bucket]["delta_ttest_t"] = float(t_stat)
-        summary[bucket]["delta_ttest_p"] = float(p_val)
 
-        print(f"  {bucket} (n={n}):")
-        print(f"    R_bad  = {np.mean(r_bad):.4f} +/- {np.std(r_bad)/np.sqrt(n):.4f}")
-        print(f"    R_fix  = {np.mean(r_fix):.4f} +/- {np.std(r_fix)/np.sqrt(n):.4f}")
-        print(f"    Delta  = {np.mean(delta):.4f} +/- {np.std(delta)/np.sqrt(n):.4f} "
-              f"(t={t_stat:.2f}, p={p_val:.2e})")
+    # Fig 1: grouped bar -- repair vs scratch by bucket
+    _fig_grouped_bar(summary, fig_dir)
+    # Fig 2: by tau line plot
+    _fig_by_tau(paired, fig_dir)
+    # Fig 3: per-sample scatter
+    _fig_scatter(paired, fig_dir)
 
-    # --- Between-bucket test: H0: E[Delta|early] = E[Delta|late] ---
-    print("\n=== Between-bucket test ===")
-    delta_early = np.array([x["delta"] for x in by_bucket["early"]])
-    delta_late = np.array([x["delta"] for x in by_bucket["late"]])
+    return summary
 
-    # Welch's t-test (unequal variance)
-    t_between, p_between = sp_stats.ttest_ind(delta_early, delta_late, equal_var=False)
-    # Mann-Whitney U (non-parametric)
-    u_stat, p_mann = sp_stats.mannwhitneyu(delta_early, delta_late, alternative="two-sided")
-    # Effect size (Cohen's d)
-    pooled_std = np.sqrt((np.var(delta_early, ddof=1) + np.var(delta_late, ddof=1)) / 2)
-    cohens_d = (np.mean(delta_early) - np.mean(delta_late)) / pooled_std if pooled_std > 0 else 0.0
 
-    print(f"  Delta_early: mean={np.mean(delta_early):.4f}, std={np.std(delta_early, ddof=1):.4f}, n={len(delta_early)}")
-    print(f"  Delta_late:  mean={np.mean(delta_late):.4f}, std={np.std(delta_late, ddof=1):.4f}, n={len(delta_late)}")
-    print(f"  Welch t-test: t={t_between:.3f}, p={p_between:.2e}")
-    print(f"  Mann-Whitney U: U={u_stat:.0f}, p={p_mann:.2e}")
-    print(f"  Cohen's d: {cohens_d:.3f}")
+def _fig_grouped_bar(summary, fig_dir):
+    fig, ax = plt.subplots(1, 1, figsize=(5, 4))
+    buckets = ["early", "late"]
+    x = np.arange(len(buckets))
+    w = 0.3
 
-    between_test = {
-        "delta_early_mean": float(np.mean(delta_early)),
-        "delta_early_std": float(np.std(delta_early, ddof=1)),
-        "delta_late_mean": float(np.mean(delta_late)),
-        "delta_late_std": float(np.std(delta_late, ddof=1)),
-        "welch_t": float(t_between),
-        "welch_p": float(p_between),
-        "mann_whitney_U": float(u_stat),
-        "mann_whitney_p": float(p_mann),
-        "cohens_d": float(cohens_d),
-        "n_early": len(delta_early),
-        "n_late": len(delta_late),
-    }
+    rep_m = [summary[b]["rollback_mean"] for b in buckets]
+    rep_e = [1.96 * summary[b]["rollback_se"] for b in buckets]
+    scr_m = [summary[b]["scratch_mean"] for b in buckets]
+    scr_e = [1.96 * summary[b]["scratch_se"] for b in buckets]
 
-    # Aggregate by tau
+    ax.bar(x - w / 2, rep_m, w, yerr=rep_e, capsize=4,
+           label="Rollback (from $\\tau$-1)", color="#e74c3c", alpha=0.85)
+    ax.bar(x + w / 2, scr_m, w, yerr=scr_e, capsize=4,
+           label="Scratch (from start)", color="#3498db", alpha=0.85)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(["early ($\\tau$=2,3)", "late ($\\tau$=4,5,6)"])
+    ax.set_ylabel("Majority-Vote Accuracy")
+    ax.set_title("Rollback Resample vs From-Scratch Resample")
+    ax.legend(loc="upper left")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ymax = max(rep_m + scr_m) * 1.4
+    ax.set_ylim(0, min(ymax, 1.05))
+    plt.tight_layout()
+    for ext in ["pdf", "png"]:
+        fig.savefig(fig_dir / f"fig_rollback_vs_scratch.{ext}",
+                    dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {fig_dir / 'fig_rollback_vs_scratch.pdf'}")
+
+# SECTION: fig_by_tau
+
+
+def _fig_by_tau(paired, fig_dir):
     by_tau = defaultdict(list)
     for p in paired:
         by_tau[p["tau"]].append(p)
 
-    print("\n=== Results by tau ===")
-    tau_summary = {}
-    for tau in sorted(by_tau.keys()):
-        items = by_tau[tau]
-        r_bad = np.array([x["r_bad"] for x in items])
-        r_fix = np.array([x["r_fix"] for x in items])
-        delta = np.array([x["delta"] for x in items])
-        n = len(items)
-        tau_summary[tau] = {
-            "n": n,
-            "r_bad_mean": float(np.mean(r_bad)),
-            "r_fix_mean": float(np.mean(r_fix)),
-            "delta_mean": float(np.mean(delta)),
-            "delta_se": float(np.std(delta) / np.sqrt(n)),
-        }
-        print(f"  tau={tau} (n={n}): R_bad={np.mean(r_bad):.4f}, "
-              f"R_fix={np.mean(r_fix):.4f}, Delta={np.mean(delta):.4f}")
+    taus = sorted(by_tau.keys())
+    rep_means, scr_means = [], []
+    for t in taus:
+        items = by_tau[t]
+        rep_means.append(np.mean([x["mv_repair"] for x in items]))
+        scr_means.append(np.mean([x["mv_scratch"] for x in items]))
 
-    # --- Figure 1: Grouped bar chart R_bad vs R_fix ---
-    fig, ax = plt.subplots(1, 1, figsize=(5, 4))
-    x = np.arange(2)
-    width = 0.3
-    buckets_list = ["early", "late"]
-    r_bad_means = [summary[b]["r_bad_mean"] for b in buckets_list]
-    r_bad_ses = [summary[b]["r_bad_se"] for b in buckets_list]
-    r_fix_means = [summary[b]["r_fix_mean"] for b in buckets_list]
-    r_fix_ses = [summary[b]["r_fix_se"] for b in buckets_list]
-
-    bars1 = ax.bar(x - width/2, r_bad_means, width, yerr=[1.96*s for s in r_bad_ses],
-                   capsize=4, label="$R_{bad}$ (no repair)", color="#e74c3c", alpha=0.8)
-    bars2 = ax.bar(x + width/2, r_fix_means, width, yerr=[1.96*s for s in r_fix_ses],
-                   capsize=4, label="$R_{fix}$ (repaired)", color="#3498db", alpha=0.8)
-    ax.set_xticks(x)
-    ax.set_xticklabels(["early ($\\tau$=2,3)", "late ($\\tau$=4,5,6)"])
-    ax.set_ylabel("Recovery Rate")
-    ax.set_title(f"Bad Prefix vs. Minimal Repair ({granularity})")
-    ax.legend(loc="upper left")
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ymax = max(r_bad_means + r_fix_means) * 1.4
-    ax.set_ylim(0, ymax)
-    plt.tight_layout()
-    fig.savefig(fig_dir / f"fig_bad_vs_repair{fig_suffix}.pdf", dpi=150, bbox_inches="tight")
-    fig.savefig(fig_dir / f"fig_bad_vs_repair{fig_suffix}.png", dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"\nSaved: {fig_dir / f'fig_bad_vs_repair{fig_suffix}.pdf'}")
-
-    # --- Figure 2: Delta_fix by bucket ---
-    fig, ax = plt.subplots(1, 1, figsize=(4, 4))
-    delta_means = [summary[b]["delta_mean"] for b in buckets_list]
-    delta_ses = [summary[b]["delta_se"] for b in buckets_list]
-    colors = ["#e74c3c", "#2ecc71"]
-    bars = ax.bar(buckets_list, delta_means, yerr=[1.96*s for s in delta_ses],
-                  capsize=5, color=colors, edgecolor="black", linewidth=0.8, width=0.5)
-    ax.set_ylabel("Repair Gain $\\Delta_{fix}$")
-    ax.set_xlabel("Error Position")
-    ax.set_title("Repair Gain: $R_{fix} - R_{bad}$")
-    ax.axhline(0, color="gray", linestyle="--", linewidth=0.8)
-    for bar, m in zip(bars, delta_means):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.005,
-                f"{m:.3f}", ha="center", va="bottom", fontsize=10)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    plt.tight_layout()
-    fig.savefig(fig_dir / f"fig_repair_gain{fig_suffix}.pdf", dpi=150, bbox_inches="tight")
-    fig.savefig(fig_dir / f"fig_repair_gain{fig_suffix}.png", dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved: {fig_dir / f'fig_repair_gain{fig_suffix}.pdf'}")
-
-    # --- Figure 3: Between-bucket Delta distribution (violin + strip) ---
-    fig, ax = plt.subplots(1, 1, figsize=(5, 4))
-    vp = ax.violinplot([delta_early, delta_late], positions=[0, 1], showmedians=True,
-                       showextrema=False)
-    for i, (body, color) in enumerate(zip(vp["bodies"], ["#e74c3c", "#2ecc71"])):
-        body.set_facecolor(color)
-        body.set_alpha(0.3)
-    vp["cmedians"].set_color("black")
-    rng = np.random.default_rng(42)
-    for i, (data, color) in enumerate(zip([delta_early, delta_late], ["#e74c3c", "#2ecc71"])):
-        jitter = rng.uniform(-0.08, 0.08, size=len(data))
-        ax.scatter(np.full(len(data), i) + jitter, data, alpha=0.15, s=8, color=color)
-    ax.set_xticks([0, 1])
-    ax.set_xticklabels(["early ($\\tau$=2,3)", "late ($\\tau$=4,5,6)"])
-    ax.set_ylabel("Per-item Repair Gain $\\Delta_i = \\hat{p}^{fix}_i - \\hat{p}^{bad}_i$")
-    ax.set_title(f"Between-Bucket Test: Welch t={t_between:.2f}, p={p_between:.2e}")
-    ax.axhline(0, color="gray", linestyle="--", linewidth=0.8)
-    for i, (data, label) in enumerate(zip([delta_early, delta_late], ["early", "late"])):
-        ax.plot(i, np.mean(data), "D", color="black", markersize=8, zorder=5)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    plt.tight_layout()
-    fig.savefig(fig_dir / f"fig_between_bucket_delta{fig_suffix}.pdf", dpi=150, bbox_inches="tight")
-    fig.savefig(fig_dir / f"fig_between_bucket_delta{fig_suffix}.png", dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved: {fig_dir / f'fig_between_bucket_delta{fig_suffix}.pdf'}")
-
-    # --- Figure 4: R_bad and R_fix by tau (line plot) ---
     fig, ax = plt.subplots(1, 1, figsize=(5.5, 4))
-    taus = sorted(tau_summary.keys())
-    r_bad_tau = [tau_summary[t]["r_bad_mean"] for t in taus]
-    r_fix_tau = [tau_summary[t]["r_fix_mean"] for t in taus]
-    delta_tau = [tau_summary[t]["delta_mean"] for t in taus]
-    delta_se_tau = [tau_summary[t]["delta_se"] for t in taus]
+    ax.plot(taus, rep_means, "o-", color="#e74c3c", linewidth=2,
+            markersize=7, label="Rollback (from $\\tau$-1)")
+    ax.plot(taus, scr_means, "s-", color="#3498db", linewidth=2,
+            markersize=7, label="Scratch (from start)")
+    ax.fill_between(taus, rep_means, scr_means, alpha=0.12, color="#3498db")
 
-    ax.plot(taus, r_bad_tau, "o-", color="#e74c3c", linewidth=2, markersize=7,
-            label="$R_{bad}$ (no repair)")
-    ax.plot(taus, r_fix_tau, "s-", color="#3498db", linewidth=2, markersize=7,
-            label="$R_{fix}$ (repaired)")
-    ax.fill_between(taus, r_bad_tau, r_fix_tau, alpha=0.12, color="#3498db")
-    for t, d in zip(taus, delta_tau):
-        ax.annotate(f"$\\Delta$={d:.3f}", (t, (r_bad_tau[taus.index(t)] + r_fix_tau[taus.index(t)])/2),
-                    textcoords="offset points", xytext=(15, 0), fontsize=8, color="#2c3e50")
+    for t, rm, sm in zip(taus, rep_means, scr_means):
+        d = sm - rm
+        ax.annotate(f"$\\Delta$={d:.3f}",
+                    (t, (rm + sm) / 2),
+                    textcoords="offset points", xytext=(15, 0),
+                    fontsize=8, color="#2c3e50")
+
     ax.set_xlabel("First Error Step ($\\tau$)")
-    ax.set_ylabel("Recovery Rate")
-    ax.set_title("Recovery with and without Minimal Repair")
+    ax.set_ylabel("Majority-Vote Accuracy")
+    ax.set_title("Accuracy by Error Position")
     ax.set_xticks(taus)
-    ax.legend(loc="upper left")
+    ax.legend(loc="best")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     plt.tight_layout()
-    fig.savefig(fig_dir / f"fig_recovery_curves{fig_suffix}.pdf", dpi=150, bbox_inches="tight")
-    fig.savefig(fig_dir / f"fig_recovery_curves{fig_suffix}.png", dpi=150, bbox_inches="tight")
+    for ext in ["pdf", "png"]:
+        fig.savefig(fig_dir / f"fig_by_tau.{ext}",
+                    dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved: {fig_dir / f'fig_recovery_curves{fig_suffix}.pdf'}")
+    print(f"Saved: {fig_dir / 'fig_by_tau.pdf'}")
 
-    # --- Figure 5: Relative position analysis ---
-    rel_data = []
-    for p in paired:
-        rel_pos = p["tau"] / p["n_steps"]
-        rel_data.append({"rel_pos": rel_pos, "delta": p["delta"],
-                         "r_bad": p["r_bad"], "r_fix": p["r_fix"]})
+# SECTION: fig_scatter
 
-    rel_positions = np.array([d["rel_pos"] for d in rel_data])
-    deltas_all = np.array([d["delta"] for d in rel_data])
-    r_bads_all = np.array([d["r_bad"] for d in rel_data])
 
-    # Tercile split
-    t33, t67 = np.percentile(rel_positions, [33.3, 66.7])
-    tercile_labels = [
-        ("early\n($\\tau/N < {:.2f}$)".format(t33), rel_positions < t33),
-        ("mid\n($\\tau/N \\in [{:.2f},{:.2f})$)".format(t33, t67),
-         (rel_positions >= t33) & (rel_positions < t67)),
-        ("late\n($\\tau/N \\geq {:.2f}$)".format(t67), rel_positions >= t67),
+def _fig_scatter(paired, fig_dir):
+    """Per-sample scatter: repair rate vs scratch rate."""
+    fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+    rep = np.array([p["rate_repair"] for p in paired])
+    scr = np.array([p["rate_scratch"] for p in paired])
+    colors = ["#e74c3c" if p["bucket"] == "early" else "#2ecc71"
+              for p in paired]
+
+    rng = np.random.default_rng(42)
+    jitter_r = rng.uniform(-0.01, 0.01, len(rep))
+    jitter_s = rng.uniform(-0.01, 0.01, len(scr))
+    ax.scatter(rep + jitter_r, scr + jitter_s,
+               c=colors, alpha=0.35, s=18, edgecolors="none")
+
+    lims = [0, 1.05]
+    ax.plot(lims, lims, "--", color="gray", linewidth=0.8)
+    ax.set_xlabel("Per-continuation Rate (Rollback)")
+    ax.set_ylabel("Per-continuation Rate (Scratch)")
+    ax.set_title("Per-sample: Rollback vs Scratch")
+    ax.set_xlim(lims)
+    ax.set_ylim(lims)
+    ax.set_aspect("equal")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    from matplotlib.lines import Line2D
+    legend_elems = [
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="#e74c3c",
+               markersize=8, label="early"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="#2ecc71",
+               markersize=8, label="late"),
     ]
-
-    # Correlation
-    from scipy.stats import pearsonr, spearmanr
-    r_spear, p_spear = spearmanr(rel_positions, deltas_all)
-    r_spear_bad, p_spear_bad = spearmanr(rel_positions, r_bads_all)
-
-    print(f"\n=== Relative position analysis ===")
-    print(f"  Spearman(rel_pos, Delta): rho={r_spear:.4f}, p={p_spear:.2e}")
-    print(f"  Spearman(rel_pos, R_bad): rho={r_spear_bad:.4f}, p={p_spear_bad:.2e}")
-
-    # Tercile bar chart for Delta
-    fig, axes = plt.subplots(1, 2, figsize=(9, 4))
-
-    # Panel A: Delta by tercile
-    ax = axes[0]
-    tercile_means, tercile_ses, tercile_ns, tercile_xlabels = [], [], [], []
-    for label, mask in tercile_labels:
-        d = deltas_all[mask]
-        tercile_means.append(np.mean(d))
-        tercile_ses.append(np.std(d, ddof=1) / np.sqrt(len(d)))
-        tercile_ns.append(len(d))
-        tercile_xlabels.append(label)
-    colors_t = ["#e74c3c", "#f39c12", "#2ecc71"]
-    bars = ax.bar(range(3), tercile_means, yerr=[1.96*s for s in tercile_ses],
-                  capsize=5, color=colors_t, edgecolor="black", linewidth=0.8, width=0.6)
-    ax.set_xticks(range(3))
-    ax.set_xticklabels(tercile_xlabels, fontsize=9)
-    ax.set_ylabel("Repair Gain $\\Delta_{fix}$")
-    ax.set_title("Repair Gain by Relative Error Position")
-    for i, (bar, m, n) in enumerate(zip(bars, tercile_means, tercile_ns)):
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
-                f"{m:.3f}\nn={n}", ha="center", va="bottom", fontsize=8)
-    ax.axhline(0, color="gray", linestyle="--", linewidth=0.8)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
-    # Panel B: Scatter + trend
-    ax = axes[1]
-    ax.scatter(rel_positions, deltas_all, alpha=0.12, s=12, color="#2c3e50")
-    # LOESS-like: binned means
-    n_bins = 10
-    bin_edges = np.linspace(0, 1, n_bins + 1)
-    bin_centers, bin_means, bin_ses_plot = [], [], []
-    for i in range(n_bins):
-        mask = (rel_positions >= bin_edges[i]) & (rel_positions < bin_edges[i+1])
-        if mask.sum() >= 5:
-            bin_centers.append((bin_edges[i] + bin_edges[i+1]) / 2)
-            bin_means.append(np.mean(deltas_all[mask]))
-            bin_ses_plot.append(1.96 * np.std(deltas_all[mask]) / np.sqrt(mask.sum()))
-    ax.errorbar(bin_centers, bin_means, yerr=bin_ses_plot, color="#e74c3c",
-                linewidth=2, marker="o", markersize=5, capsize=3, label="binned mean")
-    ax.set_xlabel("Relative Error Position ($\\tau / N_{steps}$)")
-    ax.set_ylabel("$\\Delta_i$")
-    ax.set_title(f"$\\rho_s$={r_spear:.3f}, p={p_spear:.1e}")
-    ax.axhline(0, color="gray", linestyle="--", linewidth=0.8)
-    ax.legend(loc="lower right", fontsize=9)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
+    ax.legend(handles=legend_elems, loc="lower right")
     plt.tight_layout()
-    fig.savefig(fig_dir / f"fig_relative_position{fig_suffix}.pdf", dpi=150, bbox_inches="tight")
-    fig.savefig(fig_dir / f"fig_relative_position{fig_suffix}.png", dpi=150, bbox_inches="tight")
+    for ext in ["pdf", "png"]:
+        fig.savefig(fig_dir / f"fig_scatter_rollback_scratch.{ext}",
+                    dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved: {fig_dir / f'fig_relative_position{fig_suffix}.pdf'}")
+    print(f"Saved: {fig_dir / 'fig_scatter_rollback_scratch.pdf'}")
 
-    # Median-split Welch test on relative position
-    median_rel = np.median(rel_positions)
-    early_rel_delta = deltas_all[rel_positions <= median_rel]
-    late_rel_delta = deltas_all[rel_positions > median_rel]
-    t_rel, p_rel = sp_stats.ttest_ind(early_rel_delta, late_rel_delta, equal_var=False)
-    print(f"  Median-split Welch t={t_rel:.3f}, p={p_rel:.2e}")
-    print(f"  early_rel Delta={np.mean(early_rel_delta):.4f} (n={len(early_rel_delta)})")
-    print(f"  late_rel  Delta={np.mean(late_rel_delta):.4f} (n={len(late_rel_delta)})")
+# SECTION: main
 
-    relative_pos_test = {
-        "spearman_rho_delta": float(r_spear),
-        "spearman_p_delta": float(p_spear),
-        "spearman_rho_r_bad": float(r_spear_bad),
-        "spearman_p_r_bad": float(p_spear_bad),
-        "median_split_welch_t": float(t_rel),
-        "median_split_welch_p": float(p_rel),
-        "terciles": {
-            "boundaries": [float(t33), float(t67)],
-            "means": [float(m) for m in tercile_means],
-            "ns": tercile_ns,
-        },
+
+def main() -> None:
+    args = parse_args()
+
+    if args._shard_id >= 0:
+        run_shard(args)
+        return
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig_dir = Path(args.fig_dir)
+    fig_dir.mkdir(parents=True, exist_ok=True)
+
+    # --- Load rollback continuations (from 6_5) ---
+    rollback_path = Path(args.rollback_file)
+    if not rollback_path.exists():
+        print(f"ERROR: rollback file not found: {rollback_path}")
+        sys.exit(1)
+    rollback_rows = [json.loads(l)
+                     for l in rollback_path.read_text("utf-8").splitlines()
+                     if l.strip()]
+    print(f"Loaded {len(rollback_rows)} rollback continuations")
+
+    # --- Load sample metadata for questions ---
+    samples = load_samples(args.early_file, args.late_file, args.limit)
+    keys_in_rollback = {(r["doc_id"], r["sample_idx"]) for r in rollback_rows}
+    samples = [s for s in samples
+               if (s["doc_id"], s["sample_idx"]) in keys_in_rollback]
+    print(f"Samples with rollback data: {len(samples)}")
+
+    # --- Generate from-scratch completions ---
+    scratch_path = out_dir / "scratch_continuations.jsonl"
+    if args.skip_generation and scratch_path.exists():
+        print(f"Skipping generation, using existing: {scratch_path}")
+    else:
+        scratch_path = generate_scratch_completions(args, samples, out_dir)
+
+    scratch_rows = [json.loads(l)
+                    for l in scratch_path.read_text("utf-8").splitlines()
+                    if l.strip()]
+    print(f"Loaded {len(scratch_rows)} scratch continuations")
+
+    # --- Majority vote for both conditions ---
+    rollback_mv = compute_majority_vote_accuracy(
+        rollback_rows, args.n_continuations)
+    scratch_mv = compute_majority_vote_accuracy(
+        scratch_rows, args.n_continuations)
+
+    common_keys = set(rollback_mv.keys()) & set(scratch_mv.keys())
+    print(f"Common samples for comparison: {len(common_keys)}")
+
+    paired = []
+    for key in common_keys:
+        paired.append({
+            "doc_id": key[0],
+            "sample_idx": key[1],
+            "bucket": rollback_mv[key]["bucket"],
+            "tau": rollback_mv[key]["tau"],
+            "n_steps": rollback_mv[key]["n_steps"],
+            "mv_repair": rollback_mv[key]["mv_correct"],
+            "mv_scratch": scratch_mv[key]["mv_correct"],
+            "rate_repair": rollback_mv[key]["per_cont_rate"],
+            "rate_scratch": scratch_mv[key]["per_cont_rate"],
+        })
+
+    # --- Print summary ---
+    by_bucket = defaultdict(list)
+    for p in paired:
+        by_bucket[p["bucket"]].append(p)
+
+    print("\n=== Majority-Vote Accuracy ===")
+    summary_data = {}
+    for bucket in ["early", "late"]:
+        items = by_bucket[bucket]
+        if not items:
+            continue
+        mv_rep = [x["mv_repair"] for x in items]
+        mv_scr = [x["mv_scratch"] for x in items]
+        n = len(items)
+        acc_rep = sum(mv_rep) / n
+        acc_scr = sum(mv_scr) / n
+        delta = acc_scr - acc_rep
+
+        # McNemar test
+        both_right = sum(1 for r, s in zip(mv_rep, mv_scr)
+                         if r == 1 and s == 1)
+        rep_only = sum(1 for r, s in zip(mv_rep, mv_scr)
+                       if r == 1 and s == 0)
+        scr_only = sum(1 for r, s in zip(mv_rep, mv_scr)
+                       if r == 0 and s == 1)
+        both_wrong = sum(1 for r, s in zip(mv_rep, mv_scr)
+                         if r == 0 and s == 0)
+
+        summary_data[bucket] = {
+            "n": n,
+            "acc_rollback": acc_rep,
+            "acc_scratch": acc_scr,
+            "delta": delta,
+            "both_right": both_right,
+            "rollback_only": rep_only,
+            "scratch_only": scr_only,
+            "both_wrong": both_wrong,
+        }
+
+        print(f"  {bucket} (n={n}):")
+        print(f"    Rollback MV acc = {acc_rep:.4f}")
+        print(f"    Scratch MV acc  = {acc_scr:.4f}")
+        print(f"    Delta (scratch - rollback) = {delta:+.4f}")
+        print(f"    Contingency: both_right={both_right}, "
+              f"rollback_only={rep_only}, scratch_only={scr_only}, "
+              f"both_wrong={both_wrong}")
+
+    # --- Per-continuation rate comparison ---
+    print("\n=== Per-Continuation Rate (not majority vote) ===")
+    for bucket in ["early", "late"]:
+        items = by_bucket[bucket]
+        if not items:
+            continue
+        rate_rep = np.mean([x["rate_repair"] for x in items])
+        rate_scr = np.mean([x["rate_scratch"] for x in items])
+        print(f"  {bucket}: rollback={rate_rep:.4f}, scratch={rate_scr:.4f}")
+
+    # --- Figures ---
+    summary = make_figures(paired, fig_dir)
+
+    # --- Save summary ---
+    out_summary = out_dir / "comparison_summary.json"
+    full_out = {
+        "majority_vote": summary_data,
+        "figure_summary": summary,
+        "n_paired": len(paired),
+        "n_continuations": args.n_continuations,
     }
-
-    # Save summary
-    out_path = Path(args.out_summary)
-    if args.per_question:
-        out_path = out_path.with_name(out_path.stem + "_perq" + out_path.suffix)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    full_summary = {
-        "by_bucket": summary,
-        "by_tau": {str(k): v for k, v in tau_summary.items()},
-        "between_bucket_test": between_test,
-        "relative_position_test": relative_pos_test,
-        "n_paired_samples": len(paired),
-    }
-    out_path.write_text(json.dumps(full_summary, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"Saved: {out_path}")
-    print("\nDone.")
+    out_summary.write_text(
+        json.dumps(full_out, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"\nSaved summary: {out_summary}")
+    print("Done.")
 
 
 if __name__ == "__main__":
+    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     main()
