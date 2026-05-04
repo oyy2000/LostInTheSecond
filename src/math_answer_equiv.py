@@ -141,4 +141,10 @@ def is_math_equiv(pred: str, gold: str) -> bool:
     try:
         return strip_string(pred_clean) == strip_string(gold_clean)
     except Exception:
-        return pred_clean == gold_clean
+        pass
+    try:
+        if abs(float(pred_clean) - float(gold_clean)) < 1e-6:
+            return True
+    except (ValueError, TypeError):
+        pass
+    return pred_clean == gold_clean

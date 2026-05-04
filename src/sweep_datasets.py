@@ -75,7 +75,7 @@ def _load_amc2023(n_sample: int, seed: int) -> List[dict]:
         items.append({
             "doc_id": f"amc2023_{i}",
             "question": row["problem"],
-            "gold_answer": str(row["answer"]),
+            "gold_answer": str(int(row["answer"])) if float(row["answer"]) == int(float(row["answer"])) else str(row["answer"]),
         })
     return _subsample(items, n_sample, seed)
 

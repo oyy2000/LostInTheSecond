@@ -636,21 +636,21 @@ def evaluate_configs(
                     total_toks += q_toks
                     total_prm_toks += q_prm_toks
 
-            n_answers = nd + nd * ns_use
-            tag = (f"rollback_{strat}_nd{nd}_ns{ns}"
-                   if variant == "full"
-                   else f"rollback_{strat}_nd{nd}_ns{ns}_fair")
-            results.append(dict(
-                method=tag,
-                strategy=strat,
-                variant=variant,
-                nd=nd, ns=ns,
-                n_answers=n_answers,
-                acc=correct / nq,
-                tokens_per_q=total_toks / nq,
-                total_tokens=total_toks,
-                prm_tokens=total_prm_toks,
-            ))
+                n_answers = nd + nd * ns_use
+                tag = (f"rollback_{strat}_nd{nd}_ns{ns}"
+                       if variant == "full"
+                       else f"rollback_{strat}_nd{nd}_ns{ns}_fair")
+                results.append(dict(
+                    method=tag,
+                    strategy=strat,
+                    variant=variant,
+                    nd=nd, ns=ns,
+                    n_answers=n_answers,
+                    acc=correct / nq,
+                    tokens_per_q=total_toks / nq,
+                    total_tokens=total_toks,
+                    prm_tokens=total_prm_toks,
+                ))
 
     return results
 
