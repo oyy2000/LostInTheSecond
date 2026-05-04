@@ -629,12 +629,12 @@ def evaluate_configs(
                                     q_toks += s[
                                         "suffix_tokens"]
 
-                if check_answer(
-                    DATASET, _vote(answers), q["gold_answer"]
-                ):
-                    correct += 1
-                total_toks += q_toks
-                total_prm_toks += q_prm_toks
+                    if check_answer(
+                        DATASET, _vote(answers), q["gold_answer"]
+                    ):
+                        correct += 1
+                    total_toks += q_toks
+                    total_prm_toks += q_prm_toks
 
             n_answers = nd + nd * ns_use
             tag = (f"rollback_{strat}_nd{nd}_ns{ns}"
