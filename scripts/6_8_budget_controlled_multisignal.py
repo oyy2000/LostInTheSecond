@@ -2,24 +2,33 @@
 """
 Budget-controlled rollback with pluggable error-step signals.
 
-Extends 6_6 by supporting multiple rollback signal strategies:
-  - gpt:       GPT-annotated first-error step (tau from cache)
-  - prm_drop:  first i where score[i]-score[i+1] > threshold
-               fallback to n-1 or 0 (not argmin)
-  - nll_drop:  first i where nll[i]-nll[i-1] > threshold
-               fallback to n-1 or 0 (not argmax)
+Extends 6_6 by supporting multiple rollback signal strategies, each with
+two fallback modes when the signal does not trigger:
+  - *_fb_last:  fallback to step n-1 (last step)
+  - *_fb_start: fallback to step 0 (resample from scratch)
+
+Signals:
+  - gpt / gpt_fb_last / gpt_fb_start:
+        Live GPT API call to locate first-error step (tau).
+  - prm_drop / prm_drop_fb_last / prm_drop_fb_start:
+        First i where score[i]-score[i+1] > threshold.
+  - nll_drop / nll_drop_fb_last / nll_drop_fb_start:
+        First i where nll[i]-nll[i-1] > threshold.
 
 Each signal produces a rollback step per draft. Suffix generation and
 majority-vote evaluation proceed identically to 6_6.
 
 Usage:
-    python scripts/6_8_budget_controlled_multisignal.py \
-        --budget 32 --gpus 0,1 \
-        --signals gpt prm_drop nll_drop
+    python scripts/6_8_budget_controlled_multisignal.py \\
+        --budget 32 --gpus 0,1 \\
+        --signals gpt gpt_fb_last gpt_fb_start \\
+                  prm_drop prm_drop_fb_last prm_drop_fb_start \\
+                  nll_drop nll_drop_fb_last nll_drop_fb_start
 """
 
 import argparse, json, os, re, subprocess, sys, time
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -39,17 +48,30 @@ TEMPERATURE = 0.7
 TOP_P = 0.95
 MAX_TOKENS = 2048
 MAX_MODEL_LEN = 4096
-GPU_MEM = 0.85
+GPU_MEM = 0.75
 
 ROLLBACK_CONFIGS = [(1, 32), (2, 16), (4, 8), (8, 4), (16, 2)]
 
-ALL_SIGNALS = ["gpt", "prm_drop", "nll_drop"]
+ALL_SIGNALS = [
+    "gpt_fb_last", "gpt_fb_start",
+    "prm_drop", "prm_drop_fb_last", "prm_drop_fb_start",
+    "nll_drop", "nll_drop_fb_last", "nll_drop_fb_start",
+]
+
+GPT_MODEL = "gpt-5.1"
+GPT_MAX_WORKERS = 32
 
 from src.prompt_templates import (
     build_prompt, get_stop_tokens, split_steps,
     extract_answer, check_answer,
 )
 from src.sweep_datasets import load_dataset_by_name
+from src.step_judge import (
+    build_first_error_prompt,
+    call_gpt_first_error,
+    load_env_file,
+    make_client,
+)
 
 
 # SECTION: parse_args
@@ -58,25 +80,36 @@ from src.sweep_datasets import load_dataset_by_name
 def parse_args():
     ap = argparse.ArgumentParser()
     ap.add_argument("--gpus", default="0,1")
+    ap.add_argument("--model", default=MODEL_ID,
+                    help="HuggingFace model ID for draft/suffix generation")
     ap.add_argument("--dataset", default="gsm8k")
     ap.add_argument("--budget", type=int, default=32)
     ap.add_argument("--n-sample", type=int, default=0,
                     help="Limit questions; 0=all")
     ap.add_argument("--signals", nargs="+",
-                    default=["gpt", "prm_drop", "nll_drop"],
+                    default=ALL_SIGNALS,
                     choices=ALL_SIGNALS,
                     help="Which rollback signals to evaluate")
     ap.add_argument("--prm-drop-threshold", type=float,
                     default=PRM_DROP_THRESHOLD)
     ap.add_argument("--nll-drop-threshold", type=float,
                     default=NLL_DROP_THRESHOLD)
+    ap.add_argument("--gpt-model", type=str, default=GPT_MODEL,
+                    help="GPT model for first-error detection")
+    ap.add_argument("--gpt-max-workers", type=int,
+                    default=GPT_MAX_WORKERS)
+    ap.add_argument("--gpt-temperature", type=float, default=0.0)
     ap.add_argument("--tag", default="")
     ap.add_argument("--out-dir", default="")
     ap.add_argument("--gpt-cache", default="",
-                    help="Path to gpt_first_error_cache.jsonl")
+                    help="Path to gpt_first_error_cache.jsonl "
+                         "(used as warm-start; new calls appended)")
+    ap.add_argument("--nd", type=int, nargs="+", default=None,
+                    help="Which nd values to evaluate "
+                         "(default: all from ROLLBACK_CONFIGS)")
     ap.add_argument("--skip-phase", type=int, nargs="*", default=[],
-                    help="Skip phases (1=drafts, 2=PRM, 3=logprob, "
-                         "4=suffix, 5=SC)")
+                    help="Skip phases (1=drafts, 2=PRM, 25=GPT, "
+                         "3=logprob, 4=suffix, 5=SC)")
     ap.add_argument("--_shard-id", type=int, default=-1)
     ap.add_argument("--_task-file", default="")
     ap.add_argument("--_gpu", default="0")
@@ -232,14 +265,14 @@ def run_logprob_shard(args):
     llm = LLM(
         model=MODEL_ID, tensor_parallel_size=1,
         trust_remote_code=True, dtype="half",
-        gpu_memory_utilization=GPU_MEM,
-        max_model_len=MAX_MODEL_LEN,
+        gpu_memory_utilization=0.60,
+        max_model_len=2048,
         enforce_eager=True,
     )
     tokenizer = llm.get_tokenizer()
     sp = SamplingParams(
         temperature=0.0, max_tokens=1, prompt_logprobs=1)
-    BATCH = 32
+    BATCH = 8
     results = [None] * len(tasks)
     for bi in range(0, len(tasks), BATCH):
         batch = tasks[bi:bi + BATCH]
@@ -437,36 +470,63 @@ def compute_step_mean_nll(lps, offs, bounds):
 
 
 def compute_rollback_step_prm_drop(scores, n, threshold):
-    """PRM-drop signal: first big drop, fallback n-1 or 0."""
-    if n < 2 or len(scores) < 2:
-        return 0, "fallback_short"
-    limit = min(len(scores), n)
-    drops = [scores[i] - scores[i + 1]
-             for i in range(limit - 1)]
-    for i, d in enumerate(drops):
-        if d > threshold:
-            return i + 1, "prm_drop"
-    return n - 1, "fallback_last"
+    """PRM-drop: first big drop. Returns dict with three variants."""
+    result = {}
+    triggered_step = None
+    if n >= 2 and len(scores) >= 2:
+        limit = min(len(scores), n)
+        drops = [scores[i] - scores[i + 1]
+                 for i in range(limit - 1)]
+        for i, d in enumerate(drops):
+            if d > threshold:
+                triggered_step = i + 1
+                break
+    if triggered_step is not None:
+        result["prm_drop"] = triggered_step
+        result["prm_drop_fb_last"] = triggered_step
+        result["prm_drop_fb_start"] = triggered_step
+    else:
+        result["prm_drop"] = max(n - 1, 0)
+        result["prm_drop_fb_last"] = max(n - 1, 0)
+        result["prm_drop_fb_start"] = 0
+    return result
 
 
 def compute_rollback_step_nll_drop(nlls, n, threshold):
-    """NLL-drop signal: first big NLL increase, fallback n-1 or 0."""
-    if n < 2 or len(nlls) < 2:
-        return 0, "fallback_short"
-    deltas = [nlls[i] - nlls[i - 1] for i in range(1, len(nlls))]
-    for i, d in enumerate(deltas):
-        if d > threshold:
-            return i + 1, "nll_drop"
-    return n - 1, "fallback_last"
+    """NLL-drop: first big NLL increase. Returns dict with three variants."""
+    result = {}
+    triggered_step = None
+    if n >= 2 and len(nlls) >= 2:
+        deltas = [nlls[i] - nlls[i - 1]
+                  for i in range(1, len(nlls))]
+        for i, d in enumerate(deltas):
+            if d > threshold:
+                triggered_step = i + 1
+                break
+    if triggered_step is not None:
+        result["nll_drop"] = triggered_step
+        result["nll_drop_fb_last"] = triggered_step
+        result["nll_drop_fb_start"] = triggered_step
+    else:
+        result["nll_drop"] = max(n - 1, 0)
+        result["nll_drop_fb_last"] = max(n - 1, 0)
+        result["nll_drop_fb_start"] = 0
+    return result
 
 
 def compute_rollback_step_gpt(tau, n):
-    """GPT signal: tau is 1-indexed first-error step."""
-    if tau is None or tau < 1:
-        return n - 1, "gpt_missing"
-    rb = int(tau) - 1
-    rb = max(0, min(rb, n - 1))
-    return rb, "gpt"
+    """GPT signal: tau is 1-indexed first-error step, -1 means no clear error.
+    Returns dict with two fallback variants."""
+    result = {}
+    if tau is not None and tau >= 1:
+        rb = max(0, min(int(tau) - 1, n - 1))
+        result["gpt_fb_last"] = rb
+        result["gpt_fb_start"] = rb
+    else:
+        # tau is None (API failure) or -1 (no clear error) -> fallback
+        result["gpt_fb_last"] = max(n - 1, 0)
+        result["gpt_fb_start"] = 0
+    return result
 
 
 # SECTION: evaluation
@@ -484,6 +544,22 @@ def evaluate_configs(
 ):
     nq = len(questions)
     results = []
+
+    # Greedy baseline: single draft (draft_idx=0), no voting
+    greedy_correct = 0
+    greedy_toks = 0
+    for q in questions:
+        d = draft_map.get((q["doc_id"], 0))
+        if d and check_answer(DATASET, d.get("draft_answer", ""),
+                              q["gold_answer"]):
+            greedy_correct += 1
+        greedy_toks += d.get("draft_tokens", 0) if d else 0
+    results.append(dict(
+        method="Greedy@1", nd=1, ns=0,
+        acc=greedy_correct / nq,
+        tokens_per_q=greedy_toks / nq,
+        total_tokens=greedy_toks,
+    ))
 
     sc_by_doc = defaultdict(list)
     for s in sc_recs:
@@ -513,40 +589,45 @@ def evaluate_configs(
     if not all_strategies:
         all_strategies = set(active_signals)
 
-    for strat in sorted(all_strategies):
+    for strat in sorted(all_strategies & set(active_signals)):
         for nd, ns in ROLLBACK_CONFIGS:
             if nd * ns != budget:
                 continue
-            correct = 0
-            total_toks = 0
-            total_prm_toks = 0
-            for q in questions:
-                did = q["doc_id"]
-                answers = []
-                q_toks = 0
-                q_prm_toks = 0
-                for di in range(nd):
-                    d = draft_map.get((did, di))
-                    if not d:
-                        continue
-                    answers.append(d["draft_answer"])
-                    q_toks += d["draft_tokens"]
+            ns_fair = ns - 1
+            for variant, ns_use in [("full", ns),
+                                    ("fair", ns_fair)]:
+                correct = 0
+                total_toks = 0
+                total_prm_toks = 0
+                for q in questions:
+                    did = q["doc_id"]
+                    answers = []
+                    q_toks = 0
+                    q_prm_toks = 0
+                    for di in range(nd):
+                        d = draft_map.get((did, di))
+                        if not d:
+                            continue
+                        answers.append(d["draft_answer"])
+                        q_toks += d["draft_tokens"]
 
-                    prm_rec = prm_map.get((did, di))
-                    if prm_rec:
-                        q_prm_toks += prm_rec.get(
-                            "prm_tokens", 0)
-                    rb_steps = (prm_rec.get("_rb_steps", {})
-                                if prm_rec else {})
-                    rb_step = rb_steps.get(strat)
-                    if rb_step is not None:
-                        for si in range(ns):
-                            s = sfx_map.get(
-                                (did, di, strat, rb_step, si))
-                            if s:
-                                answers.append(
-                                    s["suffix_answer"])
-                                q_toks += s["suffix_tokens"]
+                        prm_rec = prm_map.get((did, di))
+                        if prm_rec:
+                            q_prm_toks += prm_rec.get(
+                                "prm_tokens", 0)
+                        rb_steps = (prm_rec.get("_rb_steps", {})
+                                    if prm_rec else {})
+                        rb_step = rb_steps.get(strat)
+                        if rb_step is not None:
+                            for si in range(ns_use):
+                                s = sfx_map.get(
+                                    (did, di, strat,
+                                     rb_step, si))
+                                if s:
+                                    answers.append(
+                                        s["suffix_answer"])
+                                    q_toks += s[
+                                        "suffix_tokens"]
 
                 if check_answer(
                     DATASET, _vote(answers), q["gold_answer"]
@@ -555,10 +636,16 @@ def evaluate_configs(
                 total_toks += q_toks
                 total_prm_toks += q_prm_toks
 
+            n_answers = nd + nd * ns_use
+            tag = (f"rollback_{strat}_nd{nd}_ns{ns}"
+                   if variant == "full"
+                   else f"rollback_{strat}_nd{nd}_ns{ns}_fair")
             results.append(dict(
-                method=f"rollback_{strat}_nd{nd}_ns{ns}",
+                method=tag,
                 strategy=strat,
+                variant=variant,
                 nd=nd, ns=ns,
+                n_answers=n_answers,
                 acc=correct / nq,
                 tokens_per_q=total_toks / nq,
                 total_tokens=total_toks,
@@ -589,20 +676,30 @@ def make_figures(eval_results, fig_dir):
         return
 
     strat_colors = {
-        "gpt": "#2ecc71",
+        "gpt_fb_last": "#27ae60",
+        "gpt_fb_start": "#1abc9c",
         "prm_drop": "#e74c3c",
+        "prm_drop_fb_last": "#c0392b",
+        "prm_drop_fb_start": "#e67e22",
         "nll_drop": "#3498db",
+        "nll_drop_fb_last": "#2980b9",
+        "nll_drop_fb_start": "#8e44ad",
     }
     strat_markers = {
-        "gpt": "^",
+        "gpt_fb_last": "v",
+        "gpt_fb_start": "<",
         "prm_drop": "o",
+        "prm_drop_fb_last": "s",
+        "prm_drop_fb_start": "p",
         "nll_drop": "D",
+        "nll_drop_fb_last": "d",
+        "nll_drop_fb_start": "h",
     }
 
     strategies = sorted(set(
         r.get("strategy", "prm_drop") for r in rb_rows))
 
-    fig, ax = plt.subplots(1, 1, figsize=(8, 5.5))
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6.5))
     for r in sc_rows:
         ax.scatter(r["tokens_per_q"], r["acc"],
                    c="#888888", s=60, marker="s",
@@ -651,7 +748,8 @@ def make_figures(eval_results, fig_dir):
     print(f"Figures saved to {fig_dir}")
 
 
-def save_summary_table(eval_results, out_dir):
+def save_summary_table(eval_results, out_dir, phase_times=None,
+                       n_drafts=0, nq=0):
     out_dir.mkdir(parents=True, exist_ok=True)
     sc32 = next((r for r in eval_results
                  if r["method"] == "SC@32"), None)
@@ -683,6 +781,26 @@ def save_summary_table(eval_results, out_dir):
             f"| {r['acc']:.4f} | {r['tokens_per_q']:.1f} "
             f"| {r['savings_vs_sc32']:.1f}% |"
         )
+
+    if phase_times:
+        md.append("")
+        md.append("## Signal overhead (wall-clock)")
+        md.append("")
+        md.append("| signal | total_sec | ms_per_sample "
+                   "| ms_per_question |")
+        md.append("|---|---:|---:|---:|")
+        for key, label in [("prm", "PRM"), ("nll", "NLL"),
+                           ("gpt", "GPT")]:
+            t = phase_times.get(key, 0.0)
+            ps = t / n_drafts * 1000 if n_drafts else 0
+            pq = t / nq * 1000 if nq else 0
+            md.append(f"| {label} | {t:.1f} | {ps:.1f} "
+                      f"| {pq:.1f} |")
+        for key, label in [("draft", "Draft gen"),
+                           ("suffix", "Suffix gen")]:
+            t = phase_times.get(key, 0.0)
+            md.append(f"| {label} | {t:.1f} | - | - |")
+
     (out_dir / "eval_summary_table.md").write_text(
         "\n".join(md), encoding="utf-8")
     print(f"Saved table: {out_dir / 'eval_summary_table.md'}")
@@ -692,9 +810,10 @@ def save_summary_table(eval_results, out_dir):
 
 
 def main():
-    global DATASET
+    global DATASET, MODEL_ID
     args = parse_args()
     DATASET = args.dataset
+    MODEL_ID = args.model
 
     if args._shard_id >= 0:
         if args._prm:
@@ -708,6 +827,15 @@ def main():
     signals = args.signals
     prm_thr = args.prm_drop_threshold
     nll_thr = args.nll_drop_threshold
+
+    # Filter ROLLBACK_CONFIGS by --nd if specified
+    global ROLLBACK_CONFIGS
+    if args.nd:
+        allowed = set(args.nd)
+        ROLLBACK_CONFIGS = [(nd, ns) for nd, ns in ROLLBACK_CONFIGS
+                            if nd in allowed]
+        print(f"Filtered ROLLBACK_CONFIGS by --nd {args.nd}: "
+              f"{ROLLBACK_CONFIGS}")
 
     gpu_ids = [g.strip() for g in args.gpus.split(",")
                if g.strip()]
@@ -726,9 +854,11 @@ def main():
         )
 
     suffix = f"_{args.tag}" if args.tag else ""
+    model_short = Path(MODEL_ID).name.lower().replace("-", "_")
     out_dir = Path(args.out_dir) if args.out_dir else (
         PROJECT_ROOT / "results"
-        / f"{DATASET}_budget_multisignal{suffix}")
+        / f"{model_short}_budget_multisignal{suffix}"
+        / DATASET)
     out_dir.mkdir(parents=True, exist_ok=True)
     fig_dir = (PROJECT_ROOT / "figures"
                / f"budget_multisignal{suffix}")
@@ -750,7 +880,19 @@ def main():
                     if l.strip()]
     print(f"Existing checkpoint: {len(existing)} records")
 
+    # Timing bookkeeping — cumulative across runs
+    timing_path = out_dir / "phase_times.json"
+    if timing_path.exists():
+        phase_times = json.loads(timing_path.read_text())
+    else:
+        phase_times = {}
+
+    def _record_time(phase_name, elapsed):
+        phase_times[phase_name] = phase_times.get(phase_name, 0.0) + elapsed
+        timing_path.write_text(json.dumps(phase_times, indent=2))
+
     # ---- Phase 1: Sample drafts ----
+    _t0 = time.time()
     if 1 not in args.skip_phase:
         done = {(r["doc_id"], r["draft_idx"])
                 for r in existing
@@ -758,7 +900,8 @@ def main():
         tasks = []
         for q in questions:
             p = build_prompt(MODEL_ID, DATASET,
-                             q["question"])
+                             q["question"],
+                             context=q.get("context", ""))
             for di in range(nd_max):
                 if (q["doc_id"], di) in done:
                     continue
@@ -778,6 +921,8 @@ def main():
                             + "\n")
             existing.extend(new)
 
+    _record_time("draft", time.time() - _t0)
+
     drafts = [r for r in existing
               if r.get("task_type") == "draft"]
     draft_map = {(r["doc_id"], r["draft_idx"]): r
@@ -785,7 +930,8 @@ def main():
     print(f"Total drafts: {len(drafts)}")
 
     # ---- Phase 2: PRM scoring (if prm_drop in signals) ----
-    need_prm = "prm_drop" in signals
+    _t0 = time.time()
+    need_prm = any(s.startswith("prm_drop") for s in signals)
     if need_prm and 2 not in args.skip_phase:
         done = {(r["doc_id"], r.get("draft_idx", 0))
                 for r in existing
@@ -828,6 +974,8 @@ def main():
                             + "\n")
             existing.extend(new)
 
+    _record_time("prm", time.time() - _t0)
+
     prm_recs = [r for r in existing
                 if r.get("task_type") == "prm"]
     prm_map = {}
@@ -836,7 +984,8 @@ def main():
     print(f"Total PRM records: {len(prm_recs)}")
 
     # ---- Phase 3: Logprob collection (if nll_drop) ----
-    need_lp = "nll_drop" in signals
+    _t0 = time.time()
+    need_lp = any(s.startswith("nll_drop") for s in signals)
     if need_lp and 3 not in args.skip_phase:
         done = {(r["doc_id"], r.get("draft_idx", 0))
                 for r in existing
@@ -850,7 +999,8 @@ def main():
                 if not d or not d.get("draft_steps"):
                     continue
                 p = build_prompt(MODEL_ID, DATASET,
-                                 q["question"])
+                                 q["question"],
+                                 context=q.get("context", ""))
                 full = p + d["draft_text"]
                 lp_tasks.append(dict(
                     task_type="logprob",
@@ -872,33 +1022,109 @@ def main():
                             + "\n")
             existing.extend(new)
 
+    _record_time("nll", time.time() - _t0)
+
     lp_recs = [r for r in existing
                if r.get("task_type") == "logprob"]
     lp_map = {(r["doc_id"], r.get("draft_idx", 0)): r
               for r in lp_recs}
     print(f"Total logprob records: {len(lp_recs)}")
 
-    # ---- Load GPT cache (if gpt in signals) ----
-    gpt_map = {}
-    if "gpt" in signals:
-        gpt_path = args.gpt_cache
-        if not gpt_path:
-            gpt_path = str(
-                PROJECT_ROOT / "results"
-                / f"{DATASET}_3b_multi_sample"
-                / "first_error"
-                / "gpt_first_error_cache.jsonl")
-        gp = Path(gpt_path)
-        if gp.exists():
-            gpt_recs = [json.loads(l)
-                        for l in gp.read_text().splitlines()
-                        if l.strip()]
-            for r in gpt_recs:
-                gpt_map[(f"{DATASET}_{r['doc_id']}",
-                         r["sample_idx"])] = r
-            print(f"GPT cache: {len(gpt_recs)} entries")
-        else:
-            print(f"GPT cache not found: {gp}")
+    # ---- Phase 2.5: GPT first-error detection (live API) ----
+    _t0 = time.time()
+    need_gpt = any(s.startswith("gpt") for s in signals)
+    gpt_cache_path = out_dir / "gpt_first_error_cache.jsonl"
+    gpt_tau_map: Dict[Tuple, int] = {}
+
+    if need_gpt:
+        load_env_file(PROJECT_ROOT / ".env")
+
+        # Warm-start from existing cache (local or user-specified)
+        warm_cache: Dict[str, dict] = {}
+        for cp in [gpt_cache_path, Path(args.gpt_cache) if args.gpt_cache else None]:
+            if cp and cp.exists():
+                for line in cp.read_text("utf-8").splitlines():
+                    if not line.strip():
+                        continue
+                    rec = json.loads(line)
+                    key = f"{rec['doc_id']}|{rec.get('draft_idx', rec.get('sample_idx', 0))}"
+                    warm_cache[key] = rec
+        print(f"GPT warm cache: {len(warm_cache)} entries")
+
+        # Build tasks for drafts not yet in cache
+        gpt_tasks = []
+        if 25 not in args.skip_phase:
+            for q in questions:
+                for di in range(nd_max):
+                    d = draft_map.get((q["doc_id"], di))
+                    if not d or not d.get("draft_steps"):
+                        continue
+                    key = f"{q['doc_id']}|{di}"
+                    if key in warm_cache:
+                        continue
+                    gpt_tasks.append(dict(
+                        doc_id=q["doc_id"],
+                        draft_idx=di,
+                        question=q["question"],
+                        gold_answer=q["gold_answer"],
+                        steps=d["draft_steps"],
+                        n_steps=d.get("n_steps", len(d["draft_steps"])),
+                    ))
+
+        if gpt_tasks:
+            print(f"\n--- Phase 2.5: {len(gpt_tasks)} GPT "
+                  f"first-error calls ({args.gpt_model}) ---")
+            gpt_client = make_client()
+
+            def _gpt_process(task):
+                prompt = build_first_error_prompt(
+                    task["question"], task["gold_answer"],
+                    task["steps"])
+                parsed, raw = call_gpt_first_error(
+                    gpt_client, args.gpt_model, prompt,
+                    temperature=args.gpt_temperature)
+                tau = None
+                if (parsed and
+                        isinstance(parsed.get("first_error_step"), int)):
+                    tau = parsed["first_error_step"]
+                return dict(
+                    doc_id=task["doc_id"],
+                    draft_idx=task["draft_idx"],
+                    tau=tau,
+                    gpt_parsed=parsed,
+                    gpt_raw=raw,
+                )
+
+            from tqdm.auto import tqdm as _tqdm
+            if args.gpt_max_workers <= 1:
+                for t in _tqdm(gpt_tasks, desc="GPT first-error"):
+                    rec = _gpt_process(t)
+                    key = f"{rec['doc_id']}|{rec['draft_idx']}"
+                    warm_cache[key] = rec
+                    with gpt_cache_path.open("a", encoding="utf-8") as f:
+                        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            else:
+                with ThreadPoolExecutor(
+                        max_workers=args.gpt_max_workers) as pool:
+                    futs = {pool.submit(_gpt_process, t): t
+                            for t in gpt_tasks}
+                    for fut in _tqdm(as_completed(futs),
+                                     total=len(futs),
+                                     desc="GPT first-error"):
+                        rec = fut.result()
+                        key = f"{rec['doc_id']}|{rec['draft_idx']}"
+                        warm_cache[key] = rec
+                        with gpt_cache_path.open("a", encoding="utf-8") as f:
+                            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            print(f"GPT cache now: {len(warm_cache)} entries")
+
+        # Build gpt_tau_map from warm_cache
+        for key, rec in warm_cache.items():
+            parts = key.split("|")
+            doc_id, di = parts[0], int(parts[1])
+            gpt_tau_map[(doc_id, di)] = rec.get("tau")
+
+    _record_time("gpt", time.time() - _t0)
 
     # ---- Compute rollback points per signal ----
     for q in questions:
@@ -915,13 +1141,13 @@ def main():
 
             rb_steps = {}
 
-            if "prm_drop" in signals:
+            if any(s.startswith("prm_drop") for s in signals):
                 scores = prm_rec.get("step_scores", [])
-                rb, sig = compute_rollback_step_prm_drop(
-                    scores, n, prm_thr)
-                rb_steps["prm_drop"] = rb
+                rb_steps.update(
+                    compute_rollback_step_prm_drop(
+                        scores, n, prm_thr))
 
-            if "nll_drop" in signals:
+            if any(s.startswith("nll_drop") for s in signals):
                 lp_rec = lp_map.get((q["doc_id"], di))
                 if lp_rec and d.get("draft_steps"):
                     bounds = step_char_bounds(
@@ -929,21 +1155,23 @@ def main():
                     nlls = compute_step_mean_nll(
                         lp_rec["token_logprobs"],
                         lp_rec["token_offsets"], bounds)
-                    rb, sig = compute_rollback_step_nll_drop(
-                        nlls, n, nll_thr)
-                    rb_steps["nll_drop"] = rb
+                    rb_steps.update(
+                        compute_rollback_step_nll_drop(
+                            nlls, n, nll_thr))
                 else:
                     rb_steps["nll_drop"] = max(n - 1, 0)
+                    rb_steps["nll_drop_fb_last"] = max(n - 1, 0)
+                    rb_steps["nll_drop_fb_start"] = 0
 
-            if "gpt" in signals:
-                g = gpt_map.get((q["doc_id"], di))
-                tau = g.get("tau") if g else None
-                rb, sig = compute_rollback_step_gpt(tau, n)
-                rb_steps["gpt"] = rb
+            if any(s.startswith("gpt") for s in signals):
+                tau = gpt_tau_map.get((q["doc_id"], di))
+                rb_steps.update(
+                    compute_rollback_step_gpt(tau, n))
 
             prm_rec["_rb_steps"] = rb_steps
 
     # ---- Phase 4: Suffix generation ----
+    _t0 = time.time()
     if 4 not in args.skip_phase:
         done_sfx = set()
         for r in existing:
@@ -966,6 +1194,8 @@ def main():
                     continue
                 steps = d["draft_steps"]
                 for strat, rb in rb_steps.items():
+                    if strat not in signals:
+                        continue
                     b = min(rb, len(steps) - 1)
                     if b < 0:
                         b = 0
@@ -975,7 +1205,8 @@ def main():
                         prefix = ("\n\n".join(steps[:b])
                                   + "\n\n")
                     p = build_prompt(
-                        MODEL_ID, DATASET, q["question"])
+                        MODEL_ID, DATASET, q["question"],
+                        context=q.get("context", ""))
                     p += prefix
                     for si in range(ns_for_draft[di]):
                         key = (did, di, strat, b, si)
@@ -1002,6 +1233,8 @@ def main():
                             + "\n")
             existing.extend(new)
 
+    _record_time("suffix", time.time() - _t0)
+
     sfx_recs = [r for r in existing
                 if r.get("task_type") == "suffix"]
     sfx_map = {}
@@ -1019,7 +1252,8 @@ def main():
         sc_tasks = []
         for q in questions:
             p = build_prompt(MODEL_ID, DATASET,
-                             q["question"])
+                             q["question"],
+                             context=q.get("context", ""))
             for si in range(sc_n):
                 if (q["doc_id"], si) in done_sc:
                     continue
@@ -1046,6 +1280,46 @@ def main():
 
     # ---- Evaluate ----
     print("\n--- Evaluation ---")
+
+    # Signal overhead timing summary
+    n_drafts = len(drafts)
+    nq = len(questions)
+    print(f"\n--- Signal overhead (wall-clock) ---")
+    for phase_name, label in [
+        ("prm", "PRM scoring"),
+        ("nll", "NLL/logprob"),
+        ("gpt", "GPT first-error"),
+    ]:
+        t = phase_times.get(phase_name, 0.0)
+        per_sample = t / n_drafts * 1000 if n_drafts else 0
+        per_q = t / nq * 1000 if nq else 0
+        print(f"  {label:<20s}: {t:8.1f}s total | "
+              f"{per_sample:.1f}ms/sample | {per_q:.1f}ms/question")
+    for phase_name, label in [
+        ("draft", "Draft generation"),
+        ("suffix", "Suffix generation"),
+    ]:
+        t = phase_times.get(phase_name, 0.0)
+        print(f"  {label:<20s}: {t:8.1f}s total")
+
+    # Re-extract answers from raw text to pick up any
+    # extract_answer improvements without re-generating.
+    _n_re = 0
+    for d in draft_map.values():
+        if "draft_text" in d:
+            d["draft_answer"] = extract_answer(DATASET, d["draft_text"])
+            _n_re += 1
+    for s in sfx_map.values():
+        if "suffix_text" in s:
+            s["suffix_answer"] = extract_answer(DATASET, s["suffix_text"])
+            _n_re += 1
+    for s in sc_recs:
+        if "sc_text" in s:
+            s["sc_answer"] = extract_answer(DATASET, s["sc_text"])
+            _n_re += 1
+    if _n_re:
+        print(f"  Re-extracted answers for {_n_re} records")
+
     eval_results = evaluate_configs(
         questions, draft_map, prm_map, sfx_map,
         sc_recs, B, signals)
@@ -1065,7 +1339,8 @@ def main():
     print(f"\nSaved: {summary_path}")
 
     make_figures(eval_results, fig_dir)
-    save_summary_table(eval_results, out_dir)
+    save_summary_table(eval_results, out_dir, phase_times,
+                       n_drafts, nq)
     print("Done.")
 
 

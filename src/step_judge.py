@@ -68,17 +68,16 @@ Judgment criteria (follow strictly):
 
 Task:
 1. Walk through every step. For each, decide correct/incorrect by the criteria above.
-2. Report the FIRST step that is itself incorrect.
-3. Explain in one sentence what error that step introduces.
-4. Propose the MINIMAL correction to that step only (keep everything else unchanged).
-   The correction must contain ONLY the step content, without the [N] prefix.
+2. If you find an incorrect step, report the FIRST one and explain in one sentence
+   what error it introduces.
+3. If NO step contains a clear arithmetic or formula error by the criteria above,
+   set first_error_step to -1.
 
 Output STRICT JSON (no markdown fences):
 {{
-  "first_error_step": <int, 1-indexed>,
+  "first_error_step": <int, 1-indexed; or -1 if no clear error found>,
   "total_steps": {len(steps)},
-  "reason": "<one sentence explaining the error this step introduces>",
-  "correction": "<corrected step content, no [N] prefix>"
+  "reason": "<one sentence explaining the error, or 'no clear error found'>"
 }}
 """
 

@@ -2,7 +2,7 @@
 """Test OpenAI API connectivity with different BASE_URLs."""
 from openai import OpenAI
 
-key = 'sk-sNqUCd2XmGHrzXoZDCTmLa7iHdi9L5paDJhTpyNfwkHW8Hc8'
+key = 'sk-BFgHTqwOYAiDKsDKxUTm0sO3YQuYHPJlNqYrSXwbXQPFpjRA'
 
 urls = [
     'https://yinli.one/v1',
@@ -15,7 +15,7 @@ for url in urls:
     try:
         client = OpenAI(api_key=key, base_url=url)
         resp = client.chat.completions.create(
-            model='gpt-4o',
+            model='gpt-5.1',
             messages=[{'role': 'user', 'content': 'What is 2+3? Answer with just the number.'}],
             temperature=0.0,
             max_completion_tokens=16,

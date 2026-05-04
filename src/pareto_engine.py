@@ -238,7 +238,8 @@ def build_repair_suffix_tasks(
         if not repair_steps:
             continue
 
-        prompt_base = build_prompt(model_id, dataset, q["question"], tokenizer=tokenizer)
+        prompt_base = build_prompt(model_id, dataset, q["question"], tokenizer=tokenizer,
+                                   context=q.get("context", ""))
         for rs in repair_steps:
             b = max(1, min(rs, len(steps) - 1))
             prefix = "\n\n".join(steps[:b])

@@ -19,8 +19,9 @@ from typing import List
 ROOT = Path(__file__).resolve().parent.parent
 
 SUPPORTED_DATASETS = [
-    "gsm8k", "math500", "aime2024", "amc2023",
-    "olympiadbench", "hotpotqa", "humaneval", "csqa",
+    "humaneval", "csqa", "gsm8k", "math500", "aime2024", "aime2025", "amc2023",
+    "olympiadbench", "hotpotqa", "hotpotqa_open",
+    "2wikimultihopqa", "2wikimultihopqa_open",
 ]
 
 
@@ -81,7 +82,7 @@ def _load_amc2023(n_sample: int, seed: int) -> List[dict]:
 
 def _load_olympiadbench(n_sample: int, seed: int) -> List[dict]:
     from datasets import load_dataset as hf_load
-    ds = hf_load("lmms-lab/OlympiadBench", split="test_en")
+    ds = hf_load("math-ai/olympiadbench", split="test")
     items = []
     for i, row in enumerate(ds):
         items.append({
@@ -101,6 +102,124 @@ def _load_hotpotqa(n_sample: int, seed: int) -> List[dict]:
             "doc_id": row["id"],
             "question": row["question"],
             "gold_answer": row["answer"],
+        })
+    return _subsample(items, n_sample, seed)
+
+
+def _format_hotpotqa_context(ctx: dict) -> str:
+    """Format HotpotQA context paragraphs into a readable string."""
+    parts = []
+    for title, sents in zip(ctx["title"], ctx["sentences"]):
+        parts.append(f"[{title}]\n" + " ".join(sents))
+    return "\n\n".join(parts)
+
+
+def _load_hotpotqa_open(n_sample: int, seed: int) -> List[dict]:
+    from datasets import load_dataset as hf_load
+    ds = hf_load("hotpot_qa", "distractor", split="validation")
+    items = []
+    for row in ds:
+        ctx_str = _format_hotpotqa_context(row["context"])
+        items.append({
+            "doc_id": row["id"],
+            "question": row["question"],
+            "gold_answer": row["answer"],
+            "context": ctx_str,
+        })
+    return _subsample(items, n_sample, seed)
+
+
+def _load_aime2025(n_sample: int, seed: int) -> List[dict]:
+    from datasets import load_dataset as hf_load
+    ds = hf_load("yentinglin/aime_2025", split="train")
+    items = []
+    for i, row in enumerate(ds):
+        items.append({
+            "doc_id": f"aime2025_{i}",
+            "question": row["problem"],
+            "gold_answer": str(row["answer"]),
+        })
+    return _subsample(items, n_sample, seed)
+
+
+def _load_2wikimultihopqa(n_sample: int, seed: int) -> List[dict]:
+    from datasets import load_dataset as hf_load
+    ds = hf_load("scholarly-shadows-syndicate/2WikiMultiHopQA",
+                 split="validation")
+    items = []
+    for i, row in enumerate(ds):
+        items.append({
+            "doc_id": f"2wiki_{i}",
+            "question": row["question"],
+            "gold_answer": row["answer"],
+        })
+    return _subsample(items, n_sample, seed)
+
+
+def _format_2wiki_context(ctx_json: str) -> str:
+    """Format 2WikiMultiHopQA context (JSON string) into readable text."""
+    paragraphs = json.loads(ctx_json)
+    parts = []
+    for title, sents in paragraphs:
+        parts.append(f"[{title}]\n" + " ".join(sents))
+    return "\n\n".join(parts)
+
+
+def _load_2wikimultihopqa_open(n_sample: int, seed: int) -> List[dict]:
+    from datasets import load_dataset as hf_load
+    ds = hf_load("scholarly-shadows-syndicate/2WikiMultiHopQA",
+                 split="validation")
+    items = []
+    for i, row in enumerate(ds):
+        ctx_str = _format_2wiki_context(row["context"])
+        items.append({
+            "doc_id": f"2wiki_{i}",
+            "question": row["question"],
+            "gold_answer": row["answer"],
+            "context": ctx_str,
+        })
+    return _subsample(items, n_sample, seed)
+
+
+def _load_musique(n_sample: int, seed: int) -> List[dict]:
+    from datasets import load_dataset as hf_load
+    ds = hf_load("bdsaglam/musique", split="validation")
+    items = []
+    for i, row in enumerate(ds):
+        items.append({
+            "doc_id": f"musique_{i}",
+            "question": row["question"],
+            "gold_answer": row["answer"],
+        })
+    return _subsample(items, n_sample, seed)
+
+
+def _load_gpqa_diamond(n_sample: int, seed: int) -> List[dict]:
+    from datasets import load_dataset as hf_load
+    # gpqa_diamond config may not be cached; fall back to gpqa_main
+    try:
+        ds = hf_load("Idavidrein/gpqa", "gpqa_diamond", split="train")
+    except (ValueError, Exception):
+        ds = hf_load("Idavidrein/gpqa", "gpqa_main", split="train")
+    items = []
+    for i, row in enumerate(ds):
+        items.append({
+            "doc_id": f"gpqa_diamond_{i}",
+            "question": row["Question"],
+            "gold_answer": row["Correct Answer"],
+        })
+    return _subsample(items, n_sample, seed)
+
+
+def _load_strategyqa(n_sample: int, seed: int) -> List[dict]:
+    from datasets import load_dataset as hf_load
+    ds = hf_load("ChilleD/StrategyQA", split="test")
+    items = []
+    for i, row in enumerate(ds):
+        items.append({
+            "doc_id": f"strategyqa_{i}",
+            "question": row["question"],
+            "gold_answer": "yes" if row["answer"] else "no",
         })
     return _subsample(items, n_sample, seed)
 
@@ -140,9 +259,16 @@ _LOADERS = {
     "gsm8k": _load_gsm8k,
     "math500": _load_math500,
     "aime2024": _load_aime2024,
+    "aime2025": _load_aime2025,
     "amc2023": _load_amc2023,
     "olympiadbench": _load_olympiadbench,
     "hotpotqa": _load_hotpotqa,
+    "hotpotqa_open": _load_hotpotqa_open,
+    "2wikimultihopqa": _load_2wikimultihopqa,
+    "2wikimultihopqa_open": _load_2wikimultihopqa_open,
+    "musique": _load_musique,
+    "strategyqa": _load_strategyqa,
+    "gpqa_diamond": _load_gpqa_diamond,
     "humaneval": _load_humaneval,
     "csqa": _load_csqa,
 }
@@ -150,10 +276,13 @@ _LOADERS = {
 
 def load_dataset_by_name(name: str, n_sample: int = 0, seed: int = 42) -> List[dict]:
     """Load a dataset by name. n_sample=0 means use all."""
-    name = name.lower().replace("-", "").replace("_", "")
-    if name not in _LOADERS:
+    # Build a normalized lookup so names with hyphens/underscores still match
+    norm = lambda s: s.lower().replace("-", "").replace("_", "")
+    norm_loaders = {norm(k): v for k, v in _LOADERS.items()}
+    key = norm(name)
+    if key not in norm_loaders:
         raise ValueError(f"Unknown dataset '{name}'. Choose from: {SUPPORTED_DATASETS}")
-    return _LOADERS[name](n_sample, seed)
+    return norm_loaders[key](n_sample, seed)
 
 
 def _subsample(items: List[dict], n: int, seed: int) -> List[dict]:

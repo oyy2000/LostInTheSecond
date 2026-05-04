@@ -32,14 +32,6 @@ _MATH_PROMPT = (
     "Answer:"
 )
 
-_HOTPOTQA_PROMPT = (
-    "Answer the following multi-hop question step by step. "
-    "After your reasoning, write your final answer as: "
-    "The answer is <your answer>.\n\n"
-    "Question: {question}\n"
-    "Answer:"
-)
-
 _HUMANEVAL_PROMPT = (
     "Complete the following Python function. "
     "Return ONLY the function body inside a ```python code block.\n\n"
@@ -52,15 +44,57 @@ _CSQA_PROMPT = (
     "{question}"
 )
 
-MATH_DATASETS = {"gsm8k", "math500", "aime2024", "amc2023", "olympiadbench"}
+_MULTIHOP_QA_PROMPT = (
+    "Answer the following multi-hop question step by step. "
+    "After your reasoning, write your final answer as: "
+    "The answer is <your answer>.\n\n"
+    "Question: {question}\n"
+    "Answer:"
+)
+
+_MULTIHOP_QA_OPEN_PROMPT = (
+    "Read the following passages and answer the multi-hop question "
+    "step by step. After your reasoning, write your final answer as: "
+    "The answer is <your answer>.\n\n"
+    "{context}\n\n"
+    "Question: {question}\n"
+    "Answer:"
+)
+
+_STRATEGYQA_PROMPT = (
+    "Answer the following yes/no question step by step. "
+    "After your reasoning, conclude with: "
+    "So the answer is yes. OR So the answer is no.\n\n"
+    "Q: {question}\n"
+    "A:"
+)
+
+_GPQA_PROMPT = (
+    "Answer the following question. Think step by step before answering. "
+    "After your reasoning, write your final answer as: "
+    "The answer is <your answer>.\n\n"
+    "Question: {question}\n"
+    "Answer:"
+)
+
+MATH_DATASETS = {"gsm8k", "math500", "aime2024", "aime2025", "amc2023", "olympiadbench"}
+MULTIHOP_QA_DATASETS = {"2wikimultihopqa", "musique"}
+MULTIHOP_QA_OPEN_DATASETS = {"hotpotqa_open", "2wikimultihopqa_open"}
 
 
-def _get_user_prompt(dataset: str, question: str) -> str:
+def _get_user_prompt(dataset: str, question: str, context: str = "") -> str:
     ds = dataset.lower()
     if ds in MATH_DATASETS:
         return _MATH_PROMPT.format(question=question)
-    if ds == "hotpotqa":
-        return _HOTPOTQA_PROMPT.format(question=question)
+    if ds in MULTIHOP_QA_OPEN_DATASETS:
+        return _MULTIHOP_QA_OPEN_PROMPT.format(
+            context=context, question=question)
+    if ds == "hotpotqa" or ds in MULTIHOP_QA_DATASETS:
+        return _MULTIHOP_QA_PROMPT.format(question=question)
+    if ds == "strategyqa":
+        return _STRATEGYQA_PROMPT.format(question=question)
+    if ds == "gpqa_diamond":
+        return _GPQA_PROMPT.format(question=question)
     if ds == "humaneval":
         return _HUMANEVAL_PROMPT.format(question=question)
     if ds == "csqa":
@@ -102,14 +136,14 @@ def _llama_prompt(user_msg: str) -> str:
 
 
 def build_prompt(model_id: str, dataset: str, question: str,
-                 tokenizer=None) -> str:
+                 tokenizer=None, context: str = "") -> str:
     """Build a chat-formatted prompt for the given model and dataset.
 
     If *tokenizer* is provided, uses ``tokenizer.apply_chat_template``
     (correct special-token handling).  Otherwise falls back to the
     hand-crafted templates (legacy, may double-BOS on vLLM).
     """
-    user_msg = _get_user_prompt(dataset, question)
+    user_msg = _get_user_prompt(dataset, question, context=context)
     if tokenizer is not None:
         messages = [{"role": "user", "content": user_msg}]
         return tokenizer.apply_chat_template(
@@ -122,9 +156,11 @@ def build_prompt(model_id: str, dataset: str, question: str,
     return _qwen_prompt(user_msg)
 
 
-def build_prompt_ids(tokenizer, dataset: str, question: str) -> List[int]:
+def build_prompt_ids(tokenizer, dataset: str, question: str,
+                     context: str = "") -> List[int]:
     """Build prompt and return token IDs (no duplicate BOS)."""
-    prompt_str = build_prompt("", dataset, question, tokenizer=tokenizer)
+    prompt_str = build_prompt("", dataset, question, tokenizer=tokenizer,
+                              context=context)
     return tokenizer.encode(prompt_str, add_special_tokens=False)
 
 
@@ -196,14 +232,49 @@ def _gsm8k_equiv(pred: str, gold: str) -> bool:
         return p == g
 
 
+def _yesno_equiv(pred: str, gold: str) -> bool:
+    p = pred.strip().lower()
+    g = gold.strip().lower()
+    if p in ("yes", "no") and g in ("yes", "no"):
+        return p == g
+    return p == g
+
+
+def _extract_yesno_answer(text: str) -> str:
+    """Extract yes/no from a CoT response (StrategyQA style)."""
+    if not text:
+        return ""
+    text_lower = text.lower()
+    m = re.search(
+        r"(?:so\s+)?(?:the\s+)?(?:final\s+)?answer\s+is\s*[:\s]*(yes|no)",
+        text_lower,
+    )
+    if m:
+        return m.group(1)
+    m = re.search(r"(?:thus|therefore|hence|so)[,\s]+(yes|no)", text_lower)
+    if m:
+        return m.group(1)
+    last_yes = text_lower.rfind("yes")
+    last_no = text_lower.rfind("no")
+    if last_yes > last_no:
+        return "yes"
+    if last_no > last_yes:
+        return "no"
+    return ""
+
+
 def extract_answer(dataset: str, text: str) -> str:
     ds = dataset.lower()
     if ds == "gsm8k":
         return _extract_gsm8k_answer(text)
-    if ds in ("math500", "aime2024", "amc2023", "olympiadbench"):
+    if ds in ("math500", "aime2024", "aime2025", "amc2023", "olympiadbench"):
         return _extract_math_answer(text)
-    if ds == "hotpotqa":
+    if ds in ("hotpotqa", "hotpotqa_open",
+              "2wikimultihopqa", "2wikimultihopqa_open",
+              "musique", "gpqa_diamond"):
         return extract_short_answer(text)
+    if ds == "strategyqa":
+        return _extract_yesno_answer(text)
     if ds == "humaneval":
         return extract_python_code(text)
     if ds == "csqa":
@@ -215,10 +286,14 @@ def check_answer(dataset: str, pred: str, gold: str, **kw) -> bool:
     ds = dataset.lower()
     if ds == "gsm8k":
         return _gsm8k_equiv(pred, gold)
-    if ds in ("math500", "aime2024", "amc2023", "olympiadbench"):
+    if ds in ("math500", "aime2024", "aime2025", "amc2023", "olympiadbench"):
         return is_math_equiv(pred, gold)
-    if ds == "hotpotqa":
+    if ds in ("hotpotqa", "hotpotqa_open",
+              "2wikimultihopqa", "2wikimultihopqa_open",
+              "musique", "gpqa_diamond"):
         return hotpotqa_em(pred, gold)
+    if ds == "strategyqa":
+        return _yesno_equiv(pred, gold)
     if ds == "csqa":
         return is_choice_correct(pred, gold)
     if ds == "humaneval":

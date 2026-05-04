@@ -306,7 +306,8 @@ def _build_draft_tasks(
     done = {(r["doc_id"], r["draft_idx"]) for r in existing if r["task_type"] == "draft"}
     tasks = []
     for q in questions:
-        p = build_prompt(model_id, dataset, q["question"], tokenizer=tokenizer)
+        p = build_prompt(model_id, dataset, q["question"], tokenizer=tokenizer,
+                         context=q.get("context", ""))
         for di in range(nd_max):
             if (q["doc_id"], di) in done:
                 continue
@@ -343,7 +344,8 @@ def _build_suffix_tasks(
     tasks = []
     for q in questions:
         did = q["doc_id"]
-        p_base = build_prompt(model_id, dataset, q["question"], tokenizer=tokenizer)
+        p_base = build_prompt(model_id, dataset, q["question"], tokenizer=tokenizer,
+                              context=q.get("context", ""))
         for di in range(nd_max):
             d = draft_map.get((did, di))
             if not d:
@@ -383,7 +385,8 @@ def _build_fullsc_tasks(
     done = {(r["doc_id"], r["sample_idx"]) for r in existing if r["task_type"] == "fullsc"}
     tasks = []
     for q in questions:
-        p = build_prompt(model_id, dataset, q["question"], tokenizer=tokenizer)
+        p = build_prompt(model_id, dataset, q["question"], tokenizer=tokenizer,
+                         context=q.get("context", ""))
         for si in range(n_total):
             if (q["doc_id"], si) in done:
                 continue
