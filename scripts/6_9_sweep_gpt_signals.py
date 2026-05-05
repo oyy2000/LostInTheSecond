@@ -4,33 +4,8 @@ Queue runner: sweep 6_8_budget_controlled_multisignal.py across
 multiple models and datasets sequentially.
 
 Usage:
-    python scripts/6_9_sweep_gpt_signals.py \
-        --gpus 0,1,2,3 \
-        --n-sample 0 \
-        --gpt-model gpt-5.1
-
-
-    python scripts/6_9_sweep_gpt_signals.py \
-    --gpus 0,1,2,3 \
-    --datasets hotpotqa 2wikimultihopqa musique strategyqa gpqa_diamond aime2024 olympiadbench \
-    --signals prm_drop_fb_last nll_drop_fb_last \
-    --skip-phase 25 \
-    --n-sample 200 \
-    --nd 4 8 16
-        
-
-
-      python -u scripts/6_9_sweep_gpt_signals.py \
-    --gpus 4,5,6,7 \
-    --datasets 2wikimultihopqa_open hotpotqa_open olympiadbench \
-    --signals prm_drop_fb_last nll_drop_fb_last \
-    --models deepseek7b \
-    --skip-phase 25 \
-    --n-sample 10 \
-    --nd 4 8 16 \
-    2>&1 | tee logs/6_9_sweep_gpt_signals_$(date +%Y%m%d_%H%M%S).log
-
-    python -u scripts/6_9_sweep_gpt_signals.py \
+   
+    systemd-run --user --scope -p MemoryMax=32G  python -u scripts/6_9_sweep_gpt_signals.py \
     --gpus 0,1,2,3 \
     --datasets hotpotqa 2wikimultihopqa musique strategyqa gpqa_diamond aime2024 olympiadbench \
     --signals prm_drop_fb_last nll_drop_fb_last \
@@ -43,20 +18,11 @@ Usage:
     systemd-run --user --scope -p MemoryMax=32G python -u scripts/6_9_sweep_gpt_signals.py \
     --gpus 0,1,2,3 \
     --signals prm_drop_fb_last nll_drop_fb_last \
+    --models qwen3b llama3b \
     --skip-phase 25 \
     --nd 4 8 16 \
     2>&1 | tee logs/6_9_sweep_gpt_signals_$(date +%Y%m%d_%H%M%S).log
 
-# nll_drop_fb_start prm_drop_fb_start
-    python scripts/6_9_sweep_gpt_signals.py \
-        --gpus 0,1,2,3 \
-        --models qwen3b llama3b \
-        --datasets gsm8k math500
-
-    # Limit dataset samples:
-    python scripts/6_9_sweep_gpt_signals.py \
-        --gpus 0,1,2,3 \
-        --n-sample 200
 """
 
 import argparse
@@ -88,7 +54,7 @@ MULTIHOP_DATASETS = [
 MULTIHOP_OPEN_DATASETS = [
     "hotpotqa_open", "2wikimultihopqa_open",
 ]
-ALL_DATASETS = MATH_DATASETS + MULTIHOP_DATASETS + MULTIHOP_OPEN_DATASETS
+ALL_DATASETS = MATH_DATASETS + MULTIHOP_OPEN_DATASETS
 
 # Per-dataset sample caps (0 = use full test set).
 # Seed is fixed (42) in sweep_datasets, so the subset is deterministic.
