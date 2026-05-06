@@ -23,6 +23,25 @@ Usage:
     --nd 4 8 16 \
     2>&1 | tee logs/6_9_sweep_gpt_signals_$(date +%Y%m%d_%H%M%S).log
 
+
+ python -u scripts/6_9_sweep_gpt_signals.py \
+    --gpus 4,5,6,7 \
+    --datasets 2wikimultihopqa_open hotpotqa_open \
+    --models llama3b \
+    --signals prm_drop_fb_last nll_drop_fb_last \
+    --skip-phase 25 \
+    --nd 4 8 16 
+       
+    python scripts/6_9_sweep_gpt_signals.py \
+    --gpus 4,5,6,7 \
+    --models llama3b \
+    --datasets math500 gsm8k\
+    --signals prm_drop_fb_last \
+    --prm-model Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B \
+    --draft-checkpoint-dir results/qwen2.5_3b_instruct_budget_multisignal \
+    --skip-phase 3 25 5 \
+    --nd 4 8 16
+
 """
 
 import argparse
@@ -96,9 +115,19 @@ def parse_args():
                     help="Phases to skip (default: 2=PRM, 3=logprob)")
     ap.add_argument("--gpt-model", default="gpt-5.1")
     ap.add_argument("--gpt-max-workers", type=int, default=32)
+    ap.add_argument("--prm-model", default="",
+                    help="PRM model ID to pass to 6_8 "
+                         "(default: Qwen2.5-Math-PRM-7B; "
+                         "use Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B "
+                         "for 1.5B)")
     ap.add_argument("--checkpoint-dir", default="",
                     help="Base dir with existing checkpoints to copy from "
                          "(e.g. results/); expects {dataset}_budget_controlled/")
+    ap.add_argument("--draft-checkpoint-dir", default="",
+                    help="Base dir with existing draft checkpoints to "
+                         "import from (e.g. results/qwen2.5_3b_instruct"
+                         "_budget_multisignal/); expects {dataset}/"
+                         "checkpoint.jsonl")
     ap.add_argument("--dry-run", action="store_true",
                     help="Print commands without executing")
     return ap.parse_args()
@@ -122,8 +151,12 @@ def run_one(model_key, dataset, args):
     model_id = MODEL_REGISTRY[model_key]
     tag = model_key
     model_short = Path(model_id).name.lower().replace("-", "_")
+    prm_tag = ""
+    if args.prm_model and "skywork" in args.prm_model.lower():
+        prm_short = Path(args.prm_model).name.lower().replace("-", "_")
+        prm_tag = f"_prm_{prm_short}"
     out_dir = (PROJECT_ROOT / "results"
-               / f"{model_short}_budget_multisignal"
+               / f"{model_short}_budget_multisignal{prm_tag}"
                / dataset)
 
     copy_checkpoint_if_available(
@@ -146,6 +179,13 @@ def run_one(model_key, dataset, args):
         "--gpt-max-workers", str(args.gpt_max_workers),
         "--out-dir", str(out_dir),
     ]
+    if args.prm_model:
+        cmd += ["--prm-model", args.prm_model]
+    if args.draft_checkpoint_dir:
+        draft_ckpt = (Path(args.draft_checkpoint_dir)
+                      / dataset / "checkpoint.jsonl")
+        if draft_ckpt.exists():
+            cmd += ["--draft-checkpoint", str(draft_ckpt)]
     if args.skip_phase:
         cmd += ["--skip-phase"] + [str(p) for p in args.skip_phase]
     if args.nd:

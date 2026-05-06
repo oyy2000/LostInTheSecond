@@ -59,6 +59,8 @@ vectors_out/
 # Large result files -- keep results locally, don't push
 # (checkpoint jsonl, hidden states, raw outputs, etc.)
 results/
+results_mid
+results_old/
 
 # Specstory (Cursor conversation history, large & noisy)
 .specstory/

@@ -39,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MODEL_ID = "Qwen/Qwen2.5-3B-Instruct"
 PRM_MODEL_ID = "Qwen/Qwen2.5-Math-PRM-7B"
+SKYWORK_PRM_ID = "Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B"
 DATASET = "gsm8k"
 PYTHON = sys.executable
 
@@ -92,6 +93,9 @@ def parse_args():
                     help="Which rollback signals to evaluate")
     ap.add_argument("--prm-drop-threshold", type=float,
                     default=PRM_DROP_THRESHOLD)
+    ap.add_argument("--prm-model", type=str, default=PRM_MODEL_ID,
+                    help="PRM model ID (supports Qwen2.5-Math-PRM-7B "
+                         "and Skywork-o1-Open-PRM-Qwen-2.5-1.5B)")
     ap.add_argument("--nll-drop-threshold", type=float,
                     default=NLL_DROP_THRESHOLD)
     ap.add_argument("--gpt-model", type=str, default=GPT_MODEL,
@@ -110,11 +114,21 @@ def parse_args():
     ap.add_argument("--skip-phase", type=int, nargs="*", default=[],
                     help="Skip phases (1=drafts, 2=PRM, 25=GPT, "
                          "3=logprob, 4=suffix, 5=SC)")
+    ap.add_argument("--draft-checkpoint", default="",
+                    help="Path to an existing checkpoint.jsonl to "
+                         "import draft records from (reuse drafts "
+                         "without regenerating)")
+    ap.add_argument("--seed", type=int, default=None,
+                    help="Random seed for vLLM sampling "
+                         "(None = non-deterministic)")
     ap.add_argument("--_shard-id", type=int, default=-1)
     ap.add_argument("--_task-file", default="")
     ap.add_argument("--_gpu", default="0")
     ap.add_argument("--_prm", action="store_true")
+    ap.add_argument("--_skywork-prm", action="store_true")
+    ap.add_argument("--_prm-model-id", default=PRM_MODEL_ID)
     ap.add_argument("--_logprob", action="store_true")
+    ap.add_argument("--_seed", type=int, default=-1)
     return ap.parse_args()
 
 
@@ -142,6 +156,7 @@ def run_shard(args):
     sp_s = SamplingParams(
         temperature=TEMPERATURE, top_p=TOP_P,
         max_tokens=MAX_TOKENS, stop=stop,
+        seed=args._seed if args._seed >= 0 else None,
     )
     by_type = {}
     for i, t in enumerate(tasks):
@@ -250,6 +265,110 @@ def run_prm_shard(args):
           f"{sum(1 for r in results if r)}")
 
 
+# SECTION: skywork_prm_shard
+
+
+def run_skywork_prm_shard(args):
+    """Score steps with Skywork-o1-Open-PRM-Qwen-2.5-1.5B on one GPU."""
+    os.environ["CUDA_VISIBLE_DEVICES"] = args._gpu
+    import torch
+
+    # Skywork PRM only ships .bin weights; bypass the torch>=2.6
+    # check added for CVE-2025-32434 (safe here: local trusted model).
+    import transformers.utils.import_utils as _tiu
+    _tiu.check_torch_load_is_safe = lambda: None
+
+    tasks = json.loads(Path(args._task_file).read_text("utf-8"))
+    sid = args._shard_id
+    print(f"[Skywork PRM Shard {sid}] GPU {args._gpu}: "
+          f"{len(tasks)} tasks")
+
+    skywork_cache = (PROJECT_ROOT
+                     / "third_party/skywork-o1-prm-inference")
+    sys.path.insert(0, str(skywork_cache))
+    from model_utils.prm_model import PRM_MODEL
+    from model_utils.io_utils import (
+        prepare_batch_input_for_model,
+        derive_step_rewards,
+    )
+    from transformers import AutoTokenizer as ATK
+
+    prm_model_id = args._prm_model_id
+    tokenizer = ATK.from_pretrained(
+        prm_model_id, trust_remote_code=True,
+        use_safetensors=True)
+    model = PRM_MODEL.from_pretrained(
+        prm_model_id, device_map={"": "cuda:0"},
+        torch_dtype=torch.bfloat16,
+    ).eval()
+
+    BATCH = 8
+    results = [None] * len(tasks)
+    for bi in range(0, len(tasks), BATCH):
+        batch = tasks[bi:bi + BATCH]
+        batch_input_ids = []
+        batch_flags = []
+        for t in batch:
+            question = t["question"]
+            steps = t["steps"]
+            prompt_ids = tokenizer.encode(
+                tokenizer.bos_token + question + "\n")
+            reward_flags = [0] * len(prompt_ids)
+            response_ids = []
+            for i, step in enumerate(steps):
+                sep = "\n\n" if i < len(steps) - 1 else "\n"
+                chunk = step + sep
+                chunk_ids = tokenizer.encode(
+                    chunk, add_special_tokens=False)
+                flags = [0] * len(chunk_ids)
+                flags[-1] = 1
+                response_ids.extend(chunk_ids)
+                reward_flags.extend(flags)
+            input_ids = prompt_ids + response_ids
+            batch_input_ids.append(input_ids)
+            batch_flags.append(reward_flags)
+
+        padded_ids, attn_mask, padded_flags = (
+            prepare_batch_input_for_model(
+                batch_input_ids, batch_flags,
+                tokenizer.pad_token_id))
+        device = next(model.parameters()).device
+        padded_ids = padded_ids.to(device)
+        attn_mask = attn_mask.to(device)
+        padded_flags = padded_flags.to(device)
+
+        with torch.no_grad():
+            _, _, rewards = model(
+                input_ids=padded_ids,
+                attention_mask=attn_mask,
+                return_probs=True,
+            )
+        step_rewards = derive_step_rewards(rewards, padded_flags)
+
+        for j, t in enumerate(batch):
+            idx = bi + j
+            rec = {k: t[k] for k in t
+                   if k not in ("question", "steps", "prompt")}
+            scores = step_rewards[j]
+            rec["step_scores"] = [round(s, 6) for s in scores]
+            rec["prm_tokens"] = len(batch_input_ids[j])
+            results[idx] = rec
+
+        print(f"[Skywork PRM Shard {sid}] batch "
+              f"{bi // BATCH + 1}/"
+              f"{(len(tasks) + BATCH - 1) // BATCH}")
+
+    out_path = Path(tasks[0]["_out"]) if tasks else None
+    if out_path:
+        with out_path.open("w") as f:
+            for r in results:
+                if r is not None:
+                    f.write(json.dumps(r, ensure_ascii=False)
+                            + "\n")
+    print(f"[Skywork PRM Shard {sid}] Done: "
+          f"{sum(1 for r in results if r)}")
+
+
 # SECTION: logprob_shard
 
 
@@ -327,6 +446,7 @@ def run_logprob_shard(args):
 
 MIN_FREE_MEM_MIB_GEN = 6000
 MIN_FREE_MEM_MIB_PRM = 10000
+MIN_FREE_MEM_MIB_PRM_SMALL = 4000
 GPU_POLL_INTERVAL = 10
 
 
@@ -373,7 +493,8 @@ def _wait_for_free_gpu(
 
 
 def launch_shards(tasks, gpu_ids, shard_dir, prm=False,
-                  logprob=False):
+                  logprob=False, skywork_prm=False,
+                  prm_model_id=None, seed=None):
     if not tasks:
         return []
     shard_dir.mkdir(parents=True, exist_ok=True)
@@ -385,6 +506,8 @@ def launch_shards(tasks, gpu_ids, shard_dir, prm=False,
     script = str(Path(__file__).resolve())
     if prm:
         min_mem = MIN_FREE_MEM_MIB_PRM
+    elif skywork_prm:
+        min_mem = MIN_FREE_MEM_MIB_PRM_SMALL
     else:
         min_mem = MIN_FREE_MEM_MIB_GEN
 
@@ -404,11 +527,18 @@ def launch_shards(tasks, gpu_ids, shard_dir, prm=False,
         gid = _wait_for_free_gpu(gpu_ids, busy, min_mem)
         cmd = [PYTHON, script,
                "--_shard-id", str(si), "--_task-file", str(tf),
-               "--_gpu", gid, "--dataset", DATASET]
+               "--_gpu", gid, "--dataset", DATASET,
+               "--model", MODEL_ID]
         if prm:
             cmd.append("--_prm")
+        if skywork_prm:
+            cmd.append("--_skywork-prm")
+            if prm_model_id:
+                cmd += ["--_prm-model-id", prm_model_id]
         if logprob:
             cmd.append("--_logprob")
+        if seed is not None:
+            cmd += ["--_seed", str(seed)]
         env = os.environ.copy()
         env["CUDA_VISIBLE_DEVICES"] = gid
         env["TOKENIZERS_PARALLELISM"] = "false"
@@ -541,6 +671,7 @@ def _vote(answers):
 def evaluate_configs(
     questions, draft_map, prm_map, sfx_map,
     sc_recs, budget, active_signals,
+    step_tokens_map=None,
 ):
     nq = len(questions)
     results = []
@@ -593,12 +724,11 @@ def evaluate_configs(
         for nd, ns in ROLLBACK_CONFIGS:
             if nd * ns != budget:
                 continue
-            ns_fair = ns - 1
-            for variant, ns_use in [("full", ns),
-                                    ("fair", ns_fair)]:
+            for variant in ["full", "fair"]:
                 correct = 0
                 total_toks = 0
                 total_prm_toks = 0
+                total_n_answers = 0
                 for q in questions:
                     did = q["doc_id"]
                     answers = []
@@ -608,9 +738,6 @@ def evaluate_configs(
                         d = draft_map.get((did, di))
                         if not d:
                             continue
-                        answers.append(d["draft_answer"])
-                        q_toks += d["draft_tokens"]
-
                         prm_rec = prm_map.get((did, di))
                         if prm_rec:
                             q_prm_toks += prm_rec.get(
@@ -618,8 +745,19 @@ def evaluate_configs(
                         rb_steps = (prm_rec.get("_rb_steps", {})
                                     if prm_rec else {})
                         rb_step = rb_steps.get(strat)
+
                         if rb_step is not None:
-                            for si in range(ns_use):
+                            if variant == "full":
+                                answers.append(d["draft_answer"])
+                                q_toks += d["draft_tokens"]
+                            else:
+                                st_key = f"{did}|{di}"
+                                st_info = (step_tokens_map or {}).get(st_key)
+                                if st_info and rb_step > 0:
+                                    cum = st_info["cumulative_tokens"]
+                                    idx = min(rb_step - 1, len(cum) - 1)
+                                    q_toks += cum[idx]
+                            for si in range(ns):
                                 s = sfx_map.get(
                                     (did, di, strat,
                                      rb_step, si))
@@ -628,7 +766,11 @@ def evaluate_configs(
                                         s["suffix_answer"])
                                     q_toks += s[
                                         "suffix_tokens"]
+                        else:
+                            answers.append(d["draft_answer"])
+                            q_toks += d["draft_tokens"]
 
+                    total_n_answers += len(answers)
                     if check_answer(
                         DATASET, _vote(answers), q["gold_answer"]
                     ):
@@ -636,7 +778,7 @@ def evaluate_configs(
                     total_toks += q_toks
                     total_prm_toks += q_prm_toks
 
-                n_answers = nd + nd * ns_use
+                avg_n_answers = total_n_answers / nq
                 tag = (f"rollback_{strat}_nd{nd}_ns{ns}"
                        if variant == "full"
                        else f"rollback_{strat}_nd{nd}_ns{ns}_fair")
@@ -645,7 +787,7 @@ def evaluate_configs(
                     strategy=strat,
                     variant=variant,
                     nd=nd, ns=ns,
-                    n_answers=n_answers,
+                    n_answers=round(avg_n_answers, 1),
                     acc=correct / nq,
                     tokens_per_q=total_toks / nq,
                     total_tokens=total_toks,
@@ -818,6 +960,8 @@ def main():
     if args._shard_id >= 0:
         if args._prm:
             run_prm_shard(args)
+        elif args._skywork_prm:
+            run_skywork_prm_shard(args)
         elif args._logprob:
             run_logprob_shard(args)
         else:
@@ -827,6 +971,7 @@ def main():
     signals = args.signals
     prm_thr = args.prm_drop_threshold
     nll_thr = args.nll_drop_threshold
+    use_skywork = "skywork" in args.prm_model.lower()
 
     # Filter ROLLBACK_CONFIGS by --nd if specified
     global ROLLBACK_CONFIGS
@@ -854,10 +999,14 @@ def main():
         )
 
     suffix = f"_{args.tag}" if args.tag else ""
+    prm_tag = ""
+    if use_skywork:
+        prm_short = Path(args.prm_model).name.lower().replace("-", "_")
+        prm_tag = f"_prm_{prm_short}"
     model_short = Path(MODEL_ID).name.lower().replace("-", "_")
     out_dir = Path(args.out_dir) if args.out_dir else (
         PROJECT_ROOT / "results"
-        / f"{model_short}_budget_multisignal{suffix}"
+        / f"{model_short}_budget_multisignal{prm_tag}{suffix}"
         / DATASET)
     out_dir.mkdir(parents=True, exist_ok=True)
     fig_dir = (PROJECT_ROOT / "figures"
@@ -872,6 +1021,9 @@ def main():
     print(f"Dataset: {DATASET}, {nq} questions, "
           f"GPUs: {gpu_ids}")
     print(f"Budget B={B}, signals={signals}")
+    print(f"Sampling seed: {args.seed}")
+    print(f"PRM model: {args.prm_model}"
+          f"{' (Skywork 1.5B)' if use_skywork else ''}")
 
     existing = []
     if ckpt.exists():
@@ -879,6 +1031,34 @@ def main():
                     for l in ckpt.read_text().splitlines()
                     if l.strip()]
     print(f"Existing checkpoint: {len(existing)} records")
+
+    # Import drafts from external checkpoint if specified
+    if args.draft_checkpoint:
+        ext_path = Path(args.draft_checkpoint)
+        if ext_path.exists():
+            ext_recs = [json.loads(l)
+                        for l in ext_path.read_text().splitlines()
+                        if l.strip()]
+            ext_drafts = [r for r in ext_recs
+                          if r.get("task_type") == "draft"]
+            done_ids = {(r["doc_id"], r["draft_idx"])
+                        for r in existing
+                        if r.get("task_type") == "draft"}
+            imported = 0
+            with ckpt.open("a") as f:
+                for r in ext_drafts:
+                    key = (r["doc_id"], r["draft_idx"])
+                    if key not in done_ids:
+                        f.write(json.dumps(r, ensure_ascii=False)
+                                + "\n")
+                        existing.append(r)
+                        done_ids.add(key)
+                        imported += 1
+            print(f"Imported {imported} drafts from "
+                  f"{ext_path}")
+        else:
+            print(f"WARNING: --draft-checkpoint not found: "
+                  f"{ext_path}")
 
     # Timing bookkeeping — cumulative across runs
     timing_path = out_dir / "phase_times.json"
@@ -914,7 +1094,8 @@ def main():
                 ))
         if tasks:
             print(f"\n--- Phase 1: {len(tasks)} drafts ---")
-            new = launch_shards(tasks, gpu_ids, sd / "p1")
+            new = launch_shards(tasks, gpu_ids, sd / "p1",
+                                seed=args.seed)
             with ckpt.open("a") as f:
                 for r in new:
                     f.write(json.dumps(r, ensure_ascii=False)
@@ -945,29 +1126,46 @@ def main():
                 if not d or not d.get("draft_steps"):
                     continue
                 steps = d["draft_steps"]
-                step_text = ("<extra_0>".join(steps)
-                             + "<extra_0>")
-                messages = [
-                    {"role": "system",
-                     "content": "Please reason step by step, "
-                     "and put your final answer within "
-                     "\\boxed{}."},
-                    {"role": "user",
-                     "content": q["question"]},
-                    {"role": "assistant",
-                     "content": step_text},
-                ]
-                prm_tasks.append(dict(
-                    task_type="prm",
-                    doc_id=q["doc_id"],
-                    draft_idx=di,
-                    n_steps=len(steps),
-                    prompt=messages,
-                ))
+                if use_skywork:
+                    prm_tasks.append(dict(
+                        task_type="prm",
+                        doc_id=q["doc_id"],
+                        draft_idx=di,
+                        n_steps=len(steps),
+                        question=q["question"],
+                        steps=steps,
+                    ))
+                else:
+                    step_text = ("<extra_0>".join(steps)
+                                 + "<extra_0>")
+                    messages = [
+                        {"role": "system",
+                         "content": "Please reason step by step, "
+                         "and put your final answer within "
+                         "\\boxed{}."},
+                        {"role": "user",
+                         "content": q["question"]},
+                        {"role": "assistant",
+                         "content": step_text},
+                    ]
+                    prm_tasks.append(dict(
+                        task_type="prm",
+                        doc_id=q["doc_id"],
+                        draft_idx=di,
+                        n_steps=len(steps),
+                        prompt=messages,
+                    ))
         if prm_tasks:
-            print(f"\n--- Phase 2: {len(prm_tasks)} PRM ---")
-            new = launch_shards(
-                prm_tasks, gpu_ids, sd / "p2", prm=True)
+            print(f"\n--- Phase 2: {len(prm_tasks)} PRM "
+                  f"({args.prm_model}) ---")
+            if use_skywork:
+                new = launch_shards(
+                    prm_tasks, gpu_ids, sd / "p2",
+                    skywork_prm=True,
+                    prm_model_id=args.prm_model)
+            else:
+                new = launch_shards(
+                    prm_tasks, gpu_ids, sd / "p2", prm=True)
             with ckpt.open("a") as f:
                 for r in new:
                     f.write(json.dumps(r, ensure_ascii=False)
@@ -1226,7 +1424,8 @@ def main():
             print(f"\n--- Phase 4: {len(sfx_tasks)} "
                   f"suffix generations ---")
             new = launch_shards(
-                sfx_tasks, gpu_ids, sd / "p4")
+                sfx_tasks, gpu_ids, sd / "p4",
+                seed=args.seed)
             with ckpt.open("a") as f:
                 for r in new:
                     f.write(json.dumps(r, ensure_ascii=False)
@@ -1245,6 +1444,9 @@ def main():
     print(f"Total suffix records: {len(sfx_recs)}")
 
     # ---- Phase 5: Full SC baseline ----
+    # Drafts are i.i.d. samples from the same distribution, so we
+    # reuse them as part of the SC pool and only supplement the rest.
+    sc_supplement = max(0, sc_n - nd_max)
     if 5 not in args.skip_phase:
         done_sc = {(r["doc_id"], r["sc_idx"])
                    for r in existing
@@ -1254,7 +1456,7 @@ def main():
             p = build_prompt(MODEL_ID, DATASET,
                              q["question"],
                              context=q.get("context", ""))
-            for si in range(sc_n):
+            for si in range(sc_supplement):
                 if (q["doc_id"], si) in done_sc:
                     continue
                 sc_tasks.append(dict(
@@ -1265,9 +1467,11 @@ def main():
                     prompt=p,
                 ))
         if sc_tasks:
-            print(f"\n--- Phase 5: {len(sc_tasks)} SC ---")
+            print(f"\n--- Phase 5: {len(sc_tasks)} SC "
+                  f"(supplement; {nd_max} drafts reused) ---")
             new = launch_shards(
-                sc_tasks, gpu_ids, sd / "p5")
+                sc_tasks, gpu_ids, sd / "p5",
+                seed=args.seed)
             with ckpt.open("a") as f:
                 for r in new:
                     f.write(json.dumps(r, ensure_ascii=False)
@@ -1276,7 +1480,17 @@ def main():
 
     sc_recs = [r for r in existing
                if r.get("task_type") == "fullsc"]
-    print(f"Total SC records: {len(sc_recs)}")
+    # Merge drafts into SC pool (drafts are i.i.d. with fullsc)
+    draft_as_sc = []
+    for d in drafts:
+        draft_as_sc.append(dict(
+            doc_id=d["doc_id"],
+            sc_answer=d.get("draft_answer", ""),
+            sc_tokens=d.get("draft_tokens", 0),
+        ))
+    sc_pool = draft_as_sc + sc_recs
+    print(f"Total SC pool: {len(draft_as_sc)} drafts + "
+          f"{len(sc_recs)} fullsc = {len(sc_pool)}")
 
     # ---- Evaluate ----
     print("\n--- Evaluation ---")
@@ -1320,9 +1534,18 @@ def main():
     if _n_re:
         print(f"  Re-extracted answers for {_n_re} records")
 
+    step_tokens_path = out_dir / "draft_step_tokens.json"
+    step_tokens_map = None
+    if step_tokens_path.exists():
+        step_tokens_map = json.loads(step_tokens_path.read_text())
+        print(f"  Loaded step token counts: {len(step_tokens_map)} drafts")
+    else:
+        print("  WARNING: draft_step_tokens.json not found, "
+              "using full draft_tokens for fair prefix cost")
+
     eval_results = evaluate_configs(
         questions, draft_map, prm_map, sfx_map,
-        sc_recs, B, signals)
+        sc_pool, B, signals, step_tokens_map=step_tokens_map)
 
     print(f"\n{'Method':<35} {'Acc':>8} "
           f"{'Tok/Q':>10} {'TotalTok':>12}")
