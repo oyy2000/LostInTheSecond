@@ -322,3 +322,7 @@ Waiting for 3 sufficiently free GPUs: 0/3
 0, 15028 MiB, 17201 MiB, 99 %
 1, 14080 MiB, 18150 MiB, 99 %
 2, 14040 MiB, 18190 MiB, 99 %
+Waiting for 3 sufficiently free GPUs: 0/3
+0, 15028 MiB, 17201 MiB, 100 %
+1, 14080 MiB, 18150 MiB, 100 %
+2, 14040 MiB, 18190 MiB, 99 %
