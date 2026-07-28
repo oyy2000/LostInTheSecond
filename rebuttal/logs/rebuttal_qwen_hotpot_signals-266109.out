@@ -1,0 +1,17 @@
+Host: c32
+Waiting for 3 GPUs above 30000 MiB: 0/3
+0, 20575 MiB, 11655 MiB, 0 %
+1, 19796 MiB, 12434 MiB, 84 %
+2, 19652 MiB, 12578 MiB, 89 %
+Waiting for 3 GPUs above 30000 MiB: 1/3
+0, 1012 MiB, 31218 MiB, 1 %
+1, 19796 MiB, 12434 MiB, 92 %
+2, 19652 MiB, 12578 MiB, 0 %
+Waiting for 3 GPUs above 30000 MiB: 1/3
+0, 19519 MiB, 12711 MiB, 93 %
+1, 19796 MiB, 12434 MiB, 98 %
+2, 2 MiB, 32228 MiB, 0 %
+Waiting for 3 GPUs above 30000 MiB: 0/3
+0, 20203 MiB, 12027 MiB, 11 %
+1, 19796 MiB, 12434 MiB, 89 %
+2, 18366 MiB, 13864 MiB, 0 %

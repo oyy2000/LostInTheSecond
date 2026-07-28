@@ -1,0 +1,16 @@
+{
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "dataset": "math500",
+  "seeds": [42, 123, 456, 789, 1024],
+  "gpus": "0,1,2",
+  "budget": 32,
+  "n_sample": 500,
+  "signals": [
+    "prm_drop_fb_last",
+    "nll_drop_fb_last"
+  ],
+  "nd": [4, 8, 16],
+  "skip_phase": [25],
+  "out_root": "rebuttal/results/qwen2.5_3b_instruct_math500_five_seed_corrected",
+  "fig_root": "rebuttal/figures/qwen2.5_3b_instruct_math500_five_seed_corrected"
+}

@@ -1,0 +1,16 @@
+Using the latest cached version of the dataset since hotpot_qa couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'distractor' at /mnt/beegfs/youyang7/.cache/huggingface/datasets/hotpot_qa/distractor/0.0.0/1908d6afbbead072334abe2965f91bd2709910ab (last modified on Sat May  2 18:01:53 2026).
+Traceback (most recent call last):
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_17_run_nll_prm_threshold_sweep.py", line 509, in <module>
+    main()
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_17_run_nll_prm_threshold_sweep.py", line 446, in main
+    run_dataset(
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_17_run_nll_prm_threshold_sweep.py", line 316, in run_dataset
+    shared_dir = prepare_shared(
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_17_run_nll_prm_threshold_sweep.py", line 203, in prepare_shared
+    run_command(shared_command, dry_run)
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_17_run_nll_prm_threshold_sweep.py", line 154, in run_command
+    subprocess.run(command, cwd=PROJECT_ROOT, check=True)
+  File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/mnt/beegfs/youyang7/.conda/envs/fact/bin/python', '-u', '/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py', '--gpus', '0,1,2', '--model', 'meta-llama/Llama-3.2-3B-Instruct', '--prm-model', 'Qwen/Qwen2.5-Math-PRM-7B', '--dataset', 'hotpotqa_open', '--budget', '32', '--n-sample', '500', '--seed', '42', '--signals', 'nll_drop_fb_last', 'prm_drop_fb_last', '--prm-drop-threshold', '0.05', '--nll-drop-threshold', '0.1', '--logprob-batch-size', '1', '--nd', '4', '8', '16', '--skip-phase', '25', '4', '--out-dir', '/home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/hotpotqa_open/_shared_seed42', '--fig-dir', '/home/youyang7/projects/LostInTheSecond/rebuttal/figures/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/hotpotqa_open/_shared_seed42', '--timing-mode', 'auto', '--skip-eval']' returned non-zero exit status 1.

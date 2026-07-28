@@ -1,0 +1,26 @@
+{
+  "experiment_name": "deepseek_r1_7b_qwen_budget32_multisignal_c31",
+  "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+  "prm_model": "Qwen/Qwen2.5-Math-PRM-7B",
+  "datasets": {
+    "math500": {
+      "n_sample": 500
+    },
+    "hotpotqa": {
+      "n_sample": 500
+    }
+  },
+  "signals": [
+    "nll_drop_fb_last",
+    "prm_drop_fb_last"
+  ],
+  "budget": 32,
+  "nd": [
+    4,
+    8,
+    16
+  ],
+  "seed": 42,
+  "gpus": "0,1,2,3",
+  "results_root": "rebuttal/results/deepseek_r1_distill_qwen_7b_budget_multisignal/c31/seed_42"
+}

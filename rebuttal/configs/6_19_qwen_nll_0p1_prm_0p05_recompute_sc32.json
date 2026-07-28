@@ -1,0 +1,90 @@
+{
+  "experiment_name": "qwen2.5_3b_nll_0p1_prm_0p05_recompute_sc32_seed42",
+  "checkpoint_layout": "shared_plus_signal_delta_v1",
+  "sc32_checkpoint_policy": "fresh_isolated_shared_checkpoint",
+  "sc32_supplement_per_question": 16,
+  "pipeline": "rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py",
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "prm_model": "Qwen/Qwen2.5-Math-PRM-7B",
+  "logprob_batch_size": 1,
+  "seed": 42,
+  "budget": 32,
+  "nd": [4, 8, 16],
+  "signals": [
+    "nll_drop_fb_last",
+    "prm_drop_fb_last"
+  ],
+  "nll_thresholds": [0.1],
+  "prm_thresholds": [0.05],
+  "gpus": "0,1,2",
+  "results_root": "rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42",
+  "figures_root": "rebuttal/figures/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42",
+  "datasets": {
+    "math500": {
+      "n_sample": 500
+    },
+    "hotpotqa_open": {
+      "n_sample": 500
+    },
+    "gsm8k": {
+      "n_sample": 1319
+    },
+    "amc2023": {
+      "n_sample": 83
+    },
+    "aime2024": {
+      "n_sample": 90
+    },
+    "olympiadbench": {
+      "n_sample": 674
+    },
+    "2wikimultihopqa_open": {
+      "n_sample": 1000
+    }
+  },
+  "stable_sources": {
+    "math500": {
+      "draft_checkpoint": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/position_controls/checkpoint.jsonl",
+      "draft_run_config": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/position_controls/run_config.json",
+      "scoring_checkpoint": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/nll_prm_controls/checkpoint.jsonl",
+      "scoring_run_config": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/nll_prm_controls/run_config.json",
+      "nll_backend_evidence": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/nll_prm_controls/_shards/nll/log_0.txt",
+      "suffix_sources": {
+        "nll_drop_fb_last": {
+          "0.1": [
+            "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/nll_prm_controls"
+          ]
+        },
+        "prm_drop_fb_last": {
+          "0.05": [
+            "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/nll_prm_controls"
+          ]
+        }
+      },
+      "rejected_sources": [
+        "rebuttal/results_old/qwen2.5_3b_instruct_nll_prm_controls/seed_42/math500_threshold_trials/nll_0p05_prm_0p095",
+        "rebuttal/results_old/qwen2.5_3b_instruct_nll_prm_controls/seed_42/math500_threshold_trials/nll_0p1_prm_0p095"
+      ]
+    },
+    "hotpotqa_open": {
+      "draft_checkpoint": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/position_controls/checkpoint.jsonl",
+      "draft_run_config": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/position_controls/run_config.json",
+      "scoring_checkpoint": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/nll_prm_controls/checkpoint.jsonl",
+      "scoring_run_config": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/nll_prm_controls/run_config.json",
+      "nll_backend_evidence": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/threshold_trials/nll_0p2_prm_0p1/_shards/nll/log_0.txt",
+      "suffix_sources": {
+        "nll_drop_fb_last": {
+          "0.1": [
+            "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/threshold_trials/nll_0p1_prm_0p05"
+          ]
+        },
+        "prm_drop_fb_last": {
+          "0.05": [
+            "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/threshold_trials/nll_0p1_prm_0p05"
+          ]
+        }
+      },
+      "rejected_sources": []
+    }
+  }
+}

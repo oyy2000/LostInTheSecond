@@ -1,0 +1,22 @@
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Using the latest cached version of the dataset since scholarly-shadows-syndicate/2WikiMultiHopQA couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /tmp/youyang7_hf_datasets_rebuttal/scholarly-shadows-syndicate___2_wiki_multi_hop_qa/default/0.0.0/612bc5039a457880d9e7d84c3b0a4cf154b70e4f (last modified on Sun Jul 26 20:46:24 2026).
+Dataset: 2wikimultihopqa_open, 1000 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['nll_drop_fb_last', 'prm_drop_fb_last']
+Sampling seed: 42
+NLL logprob batch size: 1
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint union: 64000 records (64000 local)
+Traceback (most recent call last):
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py", line 77, in <module>
+    main()
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py", line 72, in main
+    pipeline.main()
+  File "/home/youyang7/projects/LostInTheSecond/scripts/6_8_budget_controlled_multisignal.py", line 1577, in main
+    timing = RunTimingRecorder(
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/src/wallclock.py", line 758, in __init__
+    self.run_dir.mkdir(parents=True, exist_ok=False)
+  File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/pathlib.py", line 1175, in mkdir
+    self._accessor.mkdir(self, mode)
+OSError: [Errno 30] Read-only file system: 'rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/2wikimultihopqa_open/_shared_seed42/timing/runs/20260727T004649.058245Z-3-6f7741e3'

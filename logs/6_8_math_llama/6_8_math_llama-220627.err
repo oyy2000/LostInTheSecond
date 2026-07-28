@@ -1,0 +1,6 @@
+Running scope as unit: run-rd8a5d8d11ef54f0eb39bbaf7af2e2721.scope
+Generating train split:   0%|          | 0/7473 [00:00<?, ? examples/s]Generating train split: 100%|██████████| 7473/7473 [00:00<00:00, 38413.92 examples/s]
+Generating test split:   0%|          | 0/1319 [00:00<?, ? examples/s]Generating test split: 100%|██████████| 1319/1319 [00:00<00:00, 14450.99 examples/s]
+Generating train split:   0%|          | 0/83 [00:00<?, ? examples/s]Generating train split: 100%|██████████| 83/83 [00:00<00:00, 609.16 examples/s]
+Generating train split:   0%|          | 0/90 [00:00<?, ? examples/s]Generating train split: 100%|██████████| 90/90 [00:00<00:00, 703.99 examples/s]
+/var/spool/slurmd/job220627/slurm_script: line 61: 1508498 Terminated              systemd-run --user --scope -p MemoryMax=32G python -u scripts/6_9_sweep_gpt_signals.py --gpus 1,2,3 --models llama3b --datasets gsm8k math500 amc2023 aime2024 olympiadbench --signals prm_drop_fb_last nll_drop_fb_last --n_samples 500 --skip-phase 25 --nd 4 8 16

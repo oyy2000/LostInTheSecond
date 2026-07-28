@@ -1,0 +1,85 @@
+{
+  "experiment_name": "qwen2.5_3b_nll_prm_threshold_sweep_seed42",
+  "checkpoint_layout": "shared_plus_signal_delta_v1",
+  "pipeline": "rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py",
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "prm_model": "Qwen/Qwen2.5-Math-PRM-7B",
+  "logprob_batch_size": 4,
+  "seed": 42,
+  "budget": 32,
+  "nd": [4, 8, 16],
+  "signals": [
+    "nll_drop_fb_last",
+    "prm_drop_fb_last"
+  ],
+  "nll_thresholds": [0.1, 0.2],
+  "prm_thresholds": [0.05, 0.1],
+  "gpus": "0,1,2,3",
+  "results_root": "rebuttal/results/qwen2.5_3b_instruct_nll_prm_threshold_sweep/seed_42",
+  "figures_root": "rebuttal/figures/qwen2.5_3b_instruct_nll_prm_threshold_sweep/seed_42",
+  "datasets": {
+    "math500": {
+      "n_sample": 500
+    },
+    "hotpotqa_open": {
+      "n_sample": 500
+    }
+  },
+  "stable_sources": {
+    "math500": {
+      "draft_checkpoint": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/position_controls/checkpoint.jsonl",
+      "draft_run_config": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/position_controls/run_config.json",
+      "scoring_checkpoint": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/nll_prm_controls/checkpoint.jsonl",
+      "scoring_run_config": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/nll_prm_controls/run_config.json",
+      "nll_backend_evidence": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/nll_prm_controls/_shards/nll/log_0.txt",
+      "suffix_sources": {
+        "nll_drop_fb_last": {
+          "0.1": [
+            "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/nll_prm_controls"
+          ],
+          "0.2": [
+            "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/nll_prm_controls"
+          ]
+        },
+        "prm_drop_fb_last": {
+          "0.05": [
+            "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/nll_prm_controls"
+          ],
+          "0.1": [
+            "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/math500/nll_prm_controls"
+          ]
+        }
+      },
+      "rejected_sources": [
+        "rebuttal/results_old/qwen2.5_3b_instruct_nll_prm_controls/seed_42/math500_threshold_trials/nll_0p05_prm_0p095",
+        "rebuttal/results_old/qwen2.5_3b_instruct_nll_prm_controls/seed_42/math500_threshold_trials/nll_0p1_prm_0p095"
+      ]
+    },
+    "hotpotqa_open": {
+      "draft_checkpoint": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/position_controls/checkpoint.jsonl",
+      "draft_run_config": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/position_controls/run_config.json",
+      "scoring_checkpoint": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/nll_prm_controls/checkpoint.jsonl",
+      "scoring_run_config": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/nll_prm_controls/run_config.json",
+      "nll_backend_evidence": "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/threshold_trials/nll_0p2_prm_0p1/_shards/nll/log_0.txt",
+      "suffix_sources": {
+        "nll_drop_fb_last": {
+          "0.1": [
+            "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/threshold_trials/nll_0p1_prm_0p05"
+          ],
+          "0.2": [
+            "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/threshold_trials/nll_0p2_prm_0p1"
+          ]
+        },
+        "prm_drop_fb_last": {
+          "0.05": [
+            "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/threshold_trials/nll_0p1_prm_0p05"
+          ],
+          "0.1": [
+            "rebuttal/results_old/qwen2.5_3b_instruct_seed_variance/seed_42/hotpotqa_open/threshold_trials/nll_0p2_prm_0p1"
+          ]
+        }
+      },
+      "rejected_sources": []
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "experiment_name": "llama_3.2_3b_nll_0p1_prm_0p05_recompute_sc32_seed42",
+  "checkpoint_layout": "shared_plus_signal_delta_v1",
+  "sc32_checkpoint_policy": "fresh_isolated_shared_checkpoint",
+  "sc32_supplement_per_question": 16,
+  "pipeline": "rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py",
+  "model": "meta-llama/Llama-3.2-3B-Instruct",
+  "prm_model": "Qwen/Qwen2.5-Math-PRM-7B",
+  "logprob_batch_size": 1,
+  "seed": 42,
+  "budget": 32,
+  "nd": [4, 8, 16],
+  "signals": [
+    "nll_drop_fb_last",
+    "prm_drop_fb_last"
+  ],
+  "nll_thresholds": [0.1],
+  "prm_thresholds": [0.05],
+  "gpus": "0,1,2",
+  "results_root": "rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42",
+  "figures_root": "rebuttal/figures/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42",
+  "datasets": {
+    "math500": {
+      "n_sample": 500
+    },
+    "hotpotqa_open": {
+      "n_sample": 500
+    },
+    "gsm8k": {
+      "n_sample": 1319
+    },
+    "amc2023": {
+      "n_sample": 83
+    },
+    "aime2024": {
+      "n_sample": 90
+    },
+    "olympiadbench": {
+      "n_sample": 674
+    },
+    "2wikimultihopqa_open": {
+      "n_sample": 1000
+    }
+  },
+  "stable_sources": {}
+}

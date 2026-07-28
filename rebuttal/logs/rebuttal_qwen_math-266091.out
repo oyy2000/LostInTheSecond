@@ -1,0 +1,17 @@
+Host: c49
+Waiting for 3 GPUs above 28000 MiB: 0/3
+0, 19215 MiB, 13015 MiB, 100 %
+1, 18500 MiB, 13730 MiB, 100 %
+2, 18460 MiB, 13770 MiB, 100 %
+Waiting for 3 GPUs above 28000 MiB: 0/3
+0, 19215 MiB, 13015 MiB, 100 %
+1, 18500 MiB, 13730 MiB, 99 %
+2, 18460 MiB, 13770 MiB, 100 %
+Waiting for 3 GPUs above 28000 MiB: 0/3
+0, 19215 MiB, 13015 MiB, 100 %
+1, 18500 MiB, 13730 MiB, 98 %
+2, 18460 MiB, 13770 MiB, 100 %
+Waiting for 3 GPUs above 28000 MiB: 0/3
+0, 19215 MiB, 13015 MiB, 100 %
+1, 18500 MiB, 13730 MiB, 100 %
+2, 18460 MiB, 13770 MiB, 100 %

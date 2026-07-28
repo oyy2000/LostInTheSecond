@@ -1,0 +1,114 @@
+Host: c49
+Sat Jul 25 00:05:55 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:01:00.0 Off |                  Off |
+| 36%   66C    P2            213W /  250W |   19215MiB /  32760MiB |    100%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:02:00.0 Off |                  Off |
+| 47%   73C    P2            215W /  250W |   18500MiB /  32760MiB |    100%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:C1:00.0 Off |                  Off |
+| 31%   61C    P2            204W /  250W |   18460MiB /  32760MiB |     72%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A          544447      C   /home/sli69/Python38/bin/python         718MiB |
+|    0   N/A  N/A          755880      C   /home/sli69/Python38/bin/python       18482MiB |
+|    1   N/A  N/A          755881      C   /home/sli69/Python38/bin/python       18490MiB |
+|    2   N/A  N/A          755882      C   /home/sli69/Python38/bin/python       18450MiB |
++-----------------------------------------------------------------------------------------+
+{
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "dataset": "math500",
+  "n_questions": 500,
+  "dataset_seed": 42,
+  "random_seed": 42,
+  "generation_seed": null,
+  "budget": 32,
+  "rollback_configs": [
+    [
+      4,
+      8
+    ],
+    [
+      8,
+      4
+    ],
+    [
+      16,
+      2
+    ]
+  ],
+  "strategies": [
+    "random_uniform",
+    "fixed_25",
+    "fixed_50",
+    "fixed_75",
+    "final_answer_only"
+  ],
+  "fixed_position_semantics": "target step = ceil(fraction * n_steps); retain earlier steps",
+  "temperature": 0.7,
+  "top_p": 0.95,
+  "max_tokens": 2048,
+  "final_answer_max_tokens": 128,
+  "gpu_memory_utilization": 0.32
+}
+Generating 8000 drafts
+  shard=0 gpu=0 tasks=2667
+  shard=1 gpu=1 tasks=2667
+  shard=2 gpu=2 tasks=2666
+  shard=0 exit=0
+Processed prompts:  98%|█████████▊| 105/107 [01:00<00:01,  1.35it/s, est. speed input: 202.64 toks/s, output: 1070.55 toks/s]
+Processed prompts:  99%|█████████▉| 106/107 [01:09<00:02,  2.99s/it, est. speed input: 178.80 toks/s, output: 967.95 toks/s] 
+Processed prompts: 100%|██████████| 107/107 [01:09<00:00,  1.55it/s, est. speed input: 180.33 toks/s, output: 997.56 toks/s]
+[Shard 0] draft 2667/2667
+[Shard 0] Done
+  shard=1 exit=0
+Processed prompts:  99%|█████████▉| 106/107 [01:03<00:01,  1.13s/it, est. speed input: 193.46 toks/s, output: 1078.91 toks/s]
+Processed prompts: 100%|██████████| 107/107 [01:09<00:00,  2.42s/it, est. speed input: 179.02 toks/s, output: 1015.70 toks/s]
+Processed prompts: 100%|██████████| 107/107 [01:09<00:00,  1.53it/s, est. speed input: 179.02 toks/s, output: 1015.70 toks/s]
+[Shard 1] draft 2667/2667
+[Shard 1] Done
+  shard=2 exit=0
+Processed prompts:  99%|█████████▉| 105/106 [01:09<00:02,  2.34s/it, est. speed input: 179.51 toks/s, output: 956.68 toks/s] 
+Processed prompts: 100%|██████████| 106/106 [01:16<00:00,  3.61s/it, est. speed input: 165.27 toks/s, output: 899.12 toks/s]
+Processed prompts: 100%|██████████| 106/106 [01:16<00:00,  1.39it/s, est. speed input: 165.27 toks/s, output: 899.12 toks/s]
+[Shard 2] draft 2666/2666
+[Shard 2] Done
+Suffix tasks pending: 160000 by strategy={'random_uniform': 32000, 'fixed_25': 32000, 'fixed_50': 32000, 'fixed_75': 32000, 'final_answer_only': 32000}
+  shard=0 gpu=0 tasks=53334
+  shard=1 gpu=1 tasks=53333
+  shard=2 gpu=2 tasks=53333
+  shard=0 exit=0
+Processed prompts:  95%|█████████▌| 406/426 [00:15<00:00, 97.03it/s, est. speed input: 20362.99 toks/s, output: 213.32 toks/s]
+Processed prompts: 100%|██████████| 426/426 [00:15<00:00, 71.64it/s, est. speed input: 20526.21 toks/s, output: 233.66 toks/s]
+Processed prompts: 100%|██████████| 426/426 [00:15<00:00, 26.84it/s, est. speed input: 20526.21 toks/s, output: 233.66 toks/s]
+[Shard 0] final_answer 10666/10666
+[Shard 0] Done
+  shard=1 exit=0
+Processed prompts:  88%|████████▊ | 373/426 [00:15<00:00, 72.76it/s, est. speed input: 19470.09 toks/s, output: 196.43 toks/s]
+Processed prompts:  96%|█████████▌| 409/426 [00:15<00:00, 106.84it/s, est. speed input: 20518.24 toks/s, output: 218.32 toks/s]
+Processed prompts: 100%|██████████| 426/426 [00:15<00:00, 26.69it/s, est. speed input: 20448.52 toks/s, output: 234.29 toks/s] 
+[Shard 1] final_answer 10666/10666
+[Shard 1] Done
+  shard=2 exit=0
+Processed prompts:  90%|████████▉ | 384/428 [00:15<00:00, 81.50it/s, est. speed input: 20163.80 toks/s, output: 202.39 toks/s]
+Processed prompts:  97%|█████████▋| 415/428 [00:15<00:00, 111.26it/s, est. speed input: 21035.75 toks/s, output: 225.67 toks/s]
+Processed prompts: 100%|██████████| 428/428 [00:15<00:00, 28.16it/s, est. speed input: 21572.20 toks/s, output: 244.58 toks/s] 
+[Shard 2] final_answer 10668/10668
+[Shard 2] Done
+Saved results to rebuttal/results/qwen2.5_3b_instruct_position_controls/seed_42/math500
+Complete: drafts=8000 suffixes=160000

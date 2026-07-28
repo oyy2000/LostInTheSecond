@@ -1,0 +1,100 @@
+Running on c32
+/mnt/beegfs/youyang7/.conda/envs/fact/bin/python
+Python 3.10.18
+Wed May  6 15:14:05 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:01:00.0 Off |                  Off |
+| 30%   26C    P8             18W /  250W |       2MiB /  32760MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:02:00.0 Off |                  Off |
+| 53%   77C    P2            234W /  250W |   26214MiB /  32760MiB |    100%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:C1:00.0 Off |                  Off |
+| 30%   28C    P8             11W /  250W |       2MiB /  32760MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    1   N/A  N/A         1195337      C   .../dhettik/Python38/bin/python3      26204MiB |
++-----------------------------------------------------------------------------------------+
+Sweep: 1 models x 3 datasets = 3 runs
+Models:   ['deepseek7b']
+Datasets: ['olympiadbench', 'aime2024', 'amc2023']
+Signals:  ['prm_drop_fb_last', 'nll_drop_fb_last']
+GPUs:     0,2
+N-sample: 100
+
+>>> Run 1/3: deepseek7b x olympiadbench
+
+======================================================================
+  Model: deepseek7b (deepseek-ai/DeepSeek-R1-Distill-Qwen-7B)
+  Dataset: olympiadbench
+  Out: /mnt/beegfs/youyang7/projects/LostInSecond/results/deepseek_r1_distill_qwen_7b_budget_multisignal/olympiadbench
+  Cmd: /mnt/beegfs/youyang7/.conda/envs/fact/bin/python /home/youyang7/projects/LostInTheSecond/scripts/6_8_budget_controlled_multisignal.py --gpus 0,2 --model deepseek-ai/DeepSeek-R1-Distill-Qwen-7B --dataset olympiadbench --budget 32 --n-sample 100 --signals prm_drop_fb_last nll_drop_fb_last --gpt-model gpt-5.1 --gpt-max-workers 32 --out-dir /mnt/beegfs/youyang7/projects/LostInSecond/results/deepseek_r1_distill_qwen_7b_budget_multisignal/olympiadbench --skip-phase 25 --nd 4 8 16
+======================================================================
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: olympiadbench, 100 questions, GPUs: ['0', '2']
+Budget B=32, signals=['prm_drop_fb_last', 'nll_drop_fb_last']
+Sampling seed: None
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint: 0 records
+
+--- Phase 1: 1600 drafts ---
+  Shard 0 on GPU 0: 800 tasks
+  Shard 1 on GPU 2: 800 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 288/288 [05:04<00:00,  1.06s/it, est. speed input: 170.07 toks/s, output: 1719.76 toks/s]
+[Shard 0] draft batch 2/2
+[Shard 0] Done: 800
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 288/288 [05:04<00:00,  1.06s/it, est. speed input: 169.89 toks/s, output: 1717.93 toks/s]
+[Shard 1] draft batch 2/2
+[Shard 1] Done: 800
+Total drafts: 1600
+
+--- Phase 2: 1600 PRM (Qwen/Qwen2.5-Math-PRM-7B) ---
+  Shard 0 on GPU 0: 800 tasks
+  Shard 1 on GPU 2: 800 tasks
+  Shard 0 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 0] Done: 800
+  Shard 1 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 1] Done: 800
+Total PRM records: 1600
+
+--- Phase 3: 1600 logprob ---
+  Shard 0 on GPU 0: 800 tasks
+  Shard 1 on GPU 2: 800 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 8/8 [00:00<00:00, 16070.13it/s, est. speed input: 39499047.19 toks/s, output: 0.00 toks/s]
+[LP Shard 0] batch 100/100
+[LP Shard 0] Done: 800
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 8/8 [00:00<00:00, 15872.48it/s, est. speed input: 38960423.82 toks/s, output: 0.00 toks/s]
+[LP Shard 1] batch 100/100
+[LP Shard 1] Done: 800
+Total logprob records: 1600
+
+--- Phase 4: 12800 suffix generations ---
+  Shard 0 on GPU 0: 6400 tasks
+  Shard 1 on GPU 2: 6400 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 256/256 [03:47<00:00,  1.13it/s, est. speed input: 1508.80 toks/s, output: 1080.93 toks/s]
+[Shard 0] suffix batch 13/13
+[Shard 0] Done: 6400
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 256/256 [03:48<00:00,  1.12it/s, est. speed input: 1499.37 toks/s, output: 1074.18 toks/s]
+[Shard 1] suffix batch 13/13
+[Shard 1] Done: 6400
+Total suffix records: 12800
+
+--- Phase 5: 1600 SC (supplement; 16 drafts reused) ---
+  Shard 0 on GPU 0: 800 tasks
+  Shard 1 on GPU 2: 800 tasks

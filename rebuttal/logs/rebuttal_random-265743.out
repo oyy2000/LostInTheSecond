@@ -1,0 +1,138 @@
+dataset=aime2025 random_seed=42
+source_dir=results/llama_3.2_3b_instruct_budget_multisignal/aime2025
+out_dir=rebuttal/results/llama_3.2_3b_instruct_random/seed_42/aime2025
+Fri Jul 24 13:25:56 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:01:00.0 Off |                  Off |
+| 30%   25C    P8             13W /  250W |     680MiB /  32760MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:02:00.0 Off |                  Off |
+| 30%   27C    P8              8W /  250W |       5MiB /  32760MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:C1:00.0 Off |                  Off |
+| 30%   24C    P8             17W /  250W |       5MiB /  32760MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A          544447      C   /home/sli69/Python38/bin/python         670MiB |
++-----------------------------------------------------------------------------------------+
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: aime2025, 30 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['random_uniform']
+Sampling seed: None
+Random rollback seed: 42
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint: 0 records
+Imported 480 drafts from results/llama_3.2_3b_instruct_budget_multisignal/aime2025/checkpoint.jsonl
+Total drafts: 480
+Total PRM records: 0
+Total logprob records: 0
+
+--- Phase 4: 1920 suffix generations ---
+  Shard 0 on GPU 0: 640 tasks
+  Shard 1 on GPU 1: 640 tasks
+  Shard 2 on GPU 2: 640 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 128/128 [01:00<00:00,  2.11it/s, est. speed input: 1358.39 toks/s, output: 1207.32 toks/s]
+[Shard 0] suffix batch 2/2
+[Shard 0] Done: 640
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 128/128 [00:56<00:00,  2.25it/s, est. speed input: 1451.30 toks/s, output: 1179.45 toks/s]
+[Shard 1] suffix batch 2/2
+[Shard 1] Done: 640
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 128/128 [00:57<00:00,  2.23it/s, est. speed input: 1390.02 toks/s, output: 1211.79 toks/s]
+[Shard 2] suffix batch 2/2
+[Shard 2] Done: 640
+Total suffix records: 1920
+Total SC pool: 480 drafts + 0 fullsc = 480
+
+--- Evaluation ---
+
+--- Signal overhead (wall-clock) ---
+  PRM scoring         :      0.0s total | 0.0ms/sample | 0.0ms/question
+  NLL/logprob         :      0.0s total | 0.0ms/sample | 0.0ms/question
+  GPT first-error     :      0.0s total | 0.0ms/sample | 0.0ms/question
+  Draft generation    :      0.0s total
+  Suffix generation   :    313.0s total
+  Re-extracted answers for 2400 records
+  WARNING: draft_step_tokens.json not found, using full draft_tokens for fair prefix cost
+
+Method                                   Acc      Tok/Q     TotalTok
+--------------------------------------------------------------------
+Greedy@1                              0.0333        942       28,268
+SC@8                                  0.0667       7737      232,110
+SC@16                                 0.0667      15474      464,220
+SC@32                                 0.0667      15474      464,220
+SC@40                                 0.0667      15474      464,220
+rollback_random_uniform_nd4_ns8       0.0333      22703      681,088
+rollback_random_uniform_nd4_ns8_fair   0.0333      18934      568,016
+rollback_random_uniform_nd8_ns4       0.0000      25610      768,295
+rollback_random_uniform_nd8_ns4_fair   0.0000      18135      544,043
+rollback_random_uniform_nd16_ns2      0.0667      34294    1,028,827
+rollback_random_uniform_nd16_ns2_fair   0.0667      18820      564,607
+
+Saved: rebuttal/results/llama_3.2_3b_instruct_random/seed_42/aime2025/eval_summary.json
+Figures saved to rebuttal/results/llama_3.2_3b_instruct_random/seed_42/aime2025/figures
+Saved table: rebuttal/results/llama_3.2_3b_instruct_random/seed_42/aime2025/eval_summary_table.md
+Done.
+Loading tokenizer: meta-llama/Llama-3.2-3B-Instruct
+Reading checkpoint: rebuttal/results/llama_3.2_3b_instruct_random/seed_42/aime2025/checkpoint.jsonl
+Total draft records: 480
+Saved 480 entries to: rebuttal/results/llama_3.2_3b_instruct_random/seed_42/aime2025/draft_step_tokens.json
+Token comparison: stored=464220, recount=434568, ratio=0.9361
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: aime2025, 30 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['random_uniform']
+Sampling seed: None
+Random rollback seed: 42
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint: 2400 records
+Imported 0 drafts from results/llama_3.2_3b_instruct_budget_multisignal/aime2025/checkpoint.jsonl
+Total drafts: 480
+Total PRM records: 0
+Total logprob records: 0
+Total suffix records: 1920
+Total SC pool: 480 drafts + 0 fullsc = 480
+
+--- Evaluation ---
+
+--- Signal overhead (wall-clock) ---
+  PRM scoring         :      0.0s total | 0.0ms/sample | 0.0ms/question
+  NLL/logprob         :      0.0s total | 0.0ms/sample | 0.0ms/question
+  GPT first-error     :      0.0s total | 0.0ms/sample | 0.0ms/question
+  Draft generation    :      0.0s total
+  Suffix generation   :    313.0s total
+  Re-extracted answers for 2400 records
+  Loaded step token counts: 480 drafts
+
+Method                                   Acc      Tok/Q     TotalTok
+--------------------------------------------------------------------
+Greedy@1                              0.0333        942       28,268
+SC@8                                  0.0667       7737      232,110
+SC@16                                 0.0667      15474      464,220
+SC@32                                 0.0667      15474      464,220
+SC@40                                 0.0667      15474      464,220
+rollback_random_uniform_nd4_ns8       0.0333      22703      681,088
+rollback_random_uniform_nd4_ns8_fair   0.0333      20692      620,751
+rollback_random_uniform_nd8_ns4       0.0000      25610      768,295
+rollback_random_uniform_nd8_ns4_fair   0.0000      21641      649,234
+rollback_random_uniform_nd16_ns2      0.0667      34294    1,028,827
+rollback_random_uniform_nd16_ns2_fair   0.0667      25856      775,678
+
+Saved: rebuttal/results/llama_3.2_3b_instruct_random/seed_42/aime2025/eval_summary.json
+Figures saved to rebuttal/results/llama_3.2_3b_instruct_random/seed_42/aime2025/figures
+Saved table: rebuttal/results/llama_3.2_3b_instruct_random/seed_42/aime2025/eval_summary_table.md
+Done.
+Saved comparison artifacts to rebuttal/results/llama_3.2_3b_instruct_random/seed_42/aime2025
+Random baseline complete: rebuttal/results/llama_3.2_3b_instruct_random/seed_42/aime2025

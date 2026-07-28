@@ -1,0 +1,56 @@
+Host: c32
+Python: /mnt/beegfs/youyang7/.conda/envs/fact/bin/python
+Python 3.10.18
+Mon Jul 27 21:28:20 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:01:00.0 Off |                  Off |
+| 31%   56C    P2            128W /  250W |    1348MiB /  32760MiB |     59%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:02:00.0 Off |                  Off |
+| 47%   66C    P2            145W /  250W |    1346MiB /  32760MiB |     59%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:C1:00.0 Off |                  Off |
+| 45%   64C    P2            135W /  250W |    1346MiB /  32760MiB |     66%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
+|    1   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
+|    2   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
++-----------------------------------------------------------------------------------------+
+Model: meta-llama/Llama-3.2-3B-Instruct
+Datasets: gsm8k
+Thresholds: NLL=0.1, PRM=0.05
+NLL vLLM memory utilization: 0.40
+NLL maximum input tokens: 4097
+Fresh run: drafts, PRM, vLLM NLL, suffixes, and SC@32
+SC@32: 16 stable drafts plus 16 new supplements per question
+Selected GPUs: 0,1,2
+command=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python -u /home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py --gpus 0,1,2 --model meta-llama/Llama-3.2-3B-Instruct --prm-model Qwen/Qwen2.5-Math-PRM-7B --dataset gsm8k --budget 32 --n-sample 1319 --seed 42 --signals nll_drop_fb_last prm_drop_fb_last --prm-drop-threshold 0.05 --nll-drop-threshold 0.1 --logprob-batch-size 1 --nd 4 8 16 --skip-phase 25 4 --out-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42 --fig-dir /home/youyang7/projects/LostInTheSecond/rebuttal/figures/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42 --timing-mode auto --skip-eval
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: gsm8k, 1319 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['nll_drop_fb_last', 'prm_drop_fb_last']
+Sampling seed: 42
+NLL logprob batch size: 1
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Absolute PRM threshold: 0.8
+Existing checkpoint union: 0 records (0 local)
+
+--- Phase 1: 21104 drafts ---
+  Shard 0 on GPU 0: 7035 tasks
+  Shard 1 on GPU 1: 7035 tasks
+  Shard 2 on GPU 2: 7034 tasks

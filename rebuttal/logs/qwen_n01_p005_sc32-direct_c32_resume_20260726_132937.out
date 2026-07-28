@@ -1,0 +1,42 @@
+Host: c32
+Python: /mnt/beegfs/youyang7/.conda/envs/fact/bin/python
+Python 3.10.18
+Sun Jul 26 13:29:38 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:01:00.0 Off |                  Off |
+| 30%   49C    P2            124W /  250W |    1348MiB /  32760MiB |     58%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:02:00.0 Off |                  Off |
+| 31%   61C    P2            140W /  250W |    1346MiB /  32760MiB |     58%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:C1:00.0 Off |                  Off |
+| 35%   63C    P2            134W /  250W |    1346MiB /  32760MiB |     66%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
+|    1   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
+|    2   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
++-----------------------------------------------------------------------------------------+
+Datasets: gsm8k amc2023 aime2024 olympiadbench 2wikimultihopqa_open
+Thresholds: NLL=0.1, PRM=0.05
+SC@32: 16 stable drafts plus 16 newly generated supplements per question
+Selected GPUs: 0,1,2
+usage: 6_17_run_nll_prm_threshold_sweep.py [-h] [--config CONFIG]
+                                           [--datasets {math500,hotpotqa_open} [{math500,hotpotqa_open} ...]]
+                                           [--gpus GPUS] [--dry-run]
+                                           [--aggregate-only | --reevaluate-only]
+6_17_run_nll_prm_threshold_sweep.py: error: argument --datasets: invalid choice: 'gsm8k' (choose from 'math500', 'hotpotqa_open')

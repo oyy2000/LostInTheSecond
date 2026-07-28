@@ -1,0 +1,4 @@
+aggregate=/home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_math500_five_seed_corrected/math500_five_seed_sc_summary.json
+method                                     n     mean      std      min      max
+SC@32                                      5   0.7284   0.0015   0.7260   0.7300
+Validated five-seed SC aggregation complete

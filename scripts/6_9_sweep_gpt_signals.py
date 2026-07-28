@@ -54,6 +54,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = PROJECT_ROOT / "scripts" / "6_8_budget_controlled_multisignal.py"
 PYTHON = sys.executable
+RESULTS_ROOT = Path("/mnt/beegfs/youyang7/projects/LostInSecond/results")
 
 # ---- Model registry ----
 MODEL_REGISTRY = {
@@ -65,7 +66,7 @@ MODEL_REGISTRY = {
 # ---- Dataset groups ----
 MATH_DATASETS = [
     "gsm8k", "math500", "amc2023",
-    "aime2024", "aime2025", "olympiadbench",
+    "aime2024", "olympiadbench",
 ]
 MULTIHOP_DATASETS = [
     "hotpotqa", "2wikimultihopqa",
@@ -107,7 +108,8 @@ def parse_args():
     ap.add_argument("--budget", type=int, default=32)
     ap.add_argument("--nd", type=int, nargs="+", default=None,
                     help="Which nd values to evaluate (default: all)")
-    ap.add_argument("--n-sample", type=int, default=0,
+    ap.add_argument("--n-sample", "--n_samples", type=int, default=0,
+                    dest="n_sample",
                     help="Limit dataset samples; 0=all")
     ap.add_argument("--signals", nargs="+",
                     default=["gpt_fb_last", "gpt_fb_start"])
@@ -155,7 +157,7 @@ def run_one(model_key, dataset, args):
     if args.prm_model and "skywork" in args.prm_model.lower():
         prm_short = Path(args.prm_model).name.lower().replace("-", "_")
         prm_tag = f"_prm_{prm_short}"
-    out_dir = (PROJECT_ROOT / "results"
+    out_dir = (RESULTS_ROOT
                / f"{model_short}_budget_multisignal{prm_tag}"
                / dataset)
 

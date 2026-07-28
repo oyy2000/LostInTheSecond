@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_3_run_deepseek_rebuttal.py", line 173, in <module>
+    main()
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_3_run_deepseek_rebuttal.py", line 164, in main
+    subprocess.run(command, cwd=PROJECT_ROOT, check=True)
+  File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/mnt/beegfs/youyang7/.conda/envs/fact/bin/python', '/home/youyang7/projects/LostInTheSecond/scripts/6_8_budget_controlled_multisignal.py', '--gpus', '0,1,2,3', '--model', 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B', '--dataset', 'math500', '--budget', '32', '--n-sample', '500', '--signals', 'nll_drop_fb_last', 'prm_drop_fb_last', '--prm-model', 'Qwen/Qwen2.5-Math-PRM-7B', '--nd', '4', '8', '16', '--seed', '42', '--out-dir', '/home/youyang7/projects/LostInTheSecond/rebuttal/results/deepseek_r1_distill_qwen_7b_budget_multisignal/c31/seed_42/math500', '--fig-dir', '/home/youyang7/projects/LostInTheSecond/rebuttal/results/deepseek_r1_distill_qwen_7b_budget_multisignal/c31/seed_42/math500']' returned non-zero exit status 1.

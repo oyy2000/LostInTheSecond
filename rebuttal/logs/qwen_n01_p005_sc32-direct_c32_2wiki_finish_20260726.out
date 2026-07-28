@@ -1,0 +1,43 @@
+command=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python -u /home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py --gpus 0,1,2 --model Qwen/Qwen2.5-3B-Instruct --prm-model Qwen/Qwen2.5-Math-PRM-7B --dataset 2wikimultihopqa_open --budget 32 --n-sample 1000 --seed 42 --signals nll_drop_fb_last prm_drop_fb_last --prm-drop-threshold 0.05 --nll-drop-threshold 0.1 --logprob-batch-size 1 --nd 4 8 16 --skip-phase 25 4 --out-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/2wikimultihopqa_open/_shared_seed42 --fig-dir /home/youyang7/projects/LostInTheSecond/rebuttal/figures/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/2wikimultihopqa_open/_shared_seed42 --timing-mode auto --skip-eval
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Using the latest cached version of the dataset since scholarly-shadows-syndicate/2WikiMultiHopQA couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /tmp/youyang7_hf_datasets_rebuttal/scholarly-shadows-syndicate___2_wiki_multi_hop_qa/default/0.0.0/612bc5039a457880d9e7d84c3b0a4cf154b70e4f (last modified on Sun Jul 26 20:46:24 2026).
+Dataset: 2wikimultihopqa_open, 1000 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['nll_drop_fb_last', 'prm_drop_fb_last']
+Sampling seed: 42
+NLL logprob batch size: 1
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint union: 64000 records (64000 local)
+Total drafts: 16000
+Total PRM records: 16000
+Total logprob records: 16000
+Total suffix records: 0
+Total SC pool: 16000 drafts + 16000 fullsc = 32000
+Per-question timing: 16000/48000 task events
+  nll_drop_fb_last: 0/1000 complete questions, generation_mean=None, signal_mean=None
+  prm_drop_fb_last: 0/1000 complete questions, generation_mean=None, signal_mean=None
+Evaluation skipped (checkpoint preparation only).
+Timing manifest: /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/2wikimultihopqa_open/_shared_seed42/timing/timing_manifest.json (current=10.077s, from_scratch=3444.9278984969997)
+shared fresh={"draft": 16000, "fullsc": 16000, "logprob": 16000, "prm": 16000}
+validated shared 2wikimultihopqa_open: 32000 generation seeds
+
+=== 2wikimultihopqa_open: nll_drop_fb_last threshold=0.1 ===
+reused suffix records=0
+command=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python -u /home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py --gpus 0,1,2 --model Qwen/Qwen2.5-3B-Instruct --prm-model Qwen/Qwen2.5-Math-PRM-7B --dataset 2wikimultihopqa_open --budget 32 --n-sample 1000 --seed 42 --signals nll_drop_fb_last --prm-drop-threshold 0.05 --nll-drop-threshold 0.1 --logprob-batch-size 1 --nd 4 8 16 --skip-phase 1 2 25 3 5 --out-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/2wikimultihopqa_open/signals/nll_0p1 --fig-dir /home/youyang7/projects/LostInTheSecond/rebuttal/figures/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/2wikimultihopqa_open/signals/nll_0p1 --timing-mode auto --checkpoint-part /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/2wikimultihopqa_open/_shared_seed42/checkpoint.jsonl --reuse-timing-manifest /mnt/beegfs/youyang7/projects/LostInTheSecond_rebuttal_artifacts/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/2wikimultihopqa_open/_shared_seed42/timing/timing_manifest.json
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Using the latest cached version of the dataset since scholarly-shadows-syndicate/2WikiMultiHopQA couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /tmp/youyang7_hf_datasets_rebuttal/scholarly-shadows-syndicate___2_wiki_multi_hop_qa/default/0.0.0/612bc5039a457880d9e7d84c3b0a4cf154b70e4f (last modified on Sun Jul 26 20:46:24 2026).
+Dataset: 2wikimultihopqa_open, 1000 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['nll_drop_fb_last']
+Sampling seed: 42
+NLL logprob batch size: 1
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Checkpoint part /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/2wikimultihopqa_open/_shared_seed42/checkpoint.jsonl: 64000 records
+Existing checkpoint union: 64000 records (0 local)
+Total drafts: 16000
+Total PRM records: 16000
+Total logprob records: 16000
+
+--- Phase 4: 64000 suffix generations ---

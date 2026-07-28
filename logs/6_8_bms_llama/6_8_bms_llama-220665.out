@@ -1,0 +1,61 @@
+Running on c49
+/mnt/beegfs/youyang7/.conda/envs/fact/bin/python
+Python 3.10.18
+Wed May  6 22:00:36 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:01:00.0 Off |                  Off |
+| 30%   27C    P8             12W /  250W |       2MiB /  32760MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:02:00.0 Off |                  Off |
+| 30%   28C    P8             10W /  250W |       2MiB /  32760MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:C1:00.0 Off |                  Off |
+| 30%   26C    P8             16W /  250W |       2MiB /  32760MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+Sweep: 1 models x 2 datasets = 2 runs
+Models:   ['llama3b']
+Datasets: ['aime2024', 'olympiadbench']
+Signals:  ['prm_drop_fb_last', 'nll_drop_fb_last']
+GPUs:     0,1,2
+N-sample: 500
+
+>>> Run 1/2: llama3b x aime2024
+
+======================================================================
+  Model: llama3b (meta-llama/Llama-3.2-3B-Instruct)
+  Dataset: aime2024
+  Out: /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/aime2024
+  Cmd: /mnt/beegfs/youyang7/.conda/envs/fact/bin/python /home/youyang7/projects/LostInTheSecond/scripts/6_8_budget_controlled_multisignal.py --gpus 0,1,2 --model meta-llama/Llama-3.2-3B-Instruct --dataset aime2024 --budget 32 --n-sample 500 --signals prm_drop_fb_last nll_drop_fb_last --gpt-model gpt-5.1 --gpt-max-workers 32 --out-dir /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/aime2024 --skip-phase 25 --nd 4 8 16
+======================================================================
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: aime2024, 90 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['prm_drop_fb_last', 'nll_drop_fb_last']
+Sampling seed: None
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint: 15840 records
+Total drafts: 1440
+Total PRM records: 1440
+Total logprob records: 1440
+Total suffix records: 11520
+
+--- Phase 5: 1440 SC (supplement; 16 drafts reused) ---
+  Shard 0 on GPU 0: 480 tasks
+  Shard 1 on GPU 1: 480 tasks
+  Shard 2 on GPU 2: 480 tasks

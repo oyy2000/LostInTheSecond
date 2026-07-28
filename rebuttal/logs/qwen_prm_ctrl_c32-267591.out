@@ -1,0 +1,115 @@
+Host: c32
+Dataset: hotpotqa_open
+Python: /mnt/beegfs/youyang7/.conda/envs/fact/bin/python
+Python 3.10.18
+Mon Jul 27 04:00:50 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:01:00.0 Off |                  Off |
+| 30%   51C    P2            126W /  250W |    1348MiB /  32760MiB |     58%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:02:00.0 Off |                  Off |
+| 48%   66C    P2            146W /  250W |    1346MiB /  32760MiB |     57%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:C1:00.0 Off |                  Off |
+| 33%   62C    P2            133W /  250W |    1346MiB /  32760MiB |     65%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
+|    1   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
+|    2   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
++-----------------------------------------------------------------------------------------+
+Selected GPUs: 0,1,2
+
+=== hotpotqa_open: max PRM drop and PRM<0.8 controls ===
+command=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python -u /home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py --gpus 0,1,2 --model Qwen/Qwen2.5-3B-Instruct --prm-model Qwen/Qwen2.5-Math-PRM-7B --dataset hotpotqa_open --budget 32 --n-sample 500 --seed 42 --signals prm_max_drop_fb_last prm_below_threshold_fb_last --prm-absolute-threshold 0.8 --nd 4 8 16 --skip-phase 1 2 25 3 5 --checkpoint-part /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_prm_threshold_sweep/seed_42/hotpotqa_open/_shared_seed42/checkpoint.jsonl --out-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_prm_controls/seed_42/hotpotqa_open --fig-dir /home/youyang7/projects/LostInTheSecond/rebuttal/figures/qwen2.5_3b_instruct_prm_controls/seed_42/hotpotqa_open --timing-mode auto --reuse-timing-manifest /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_prm_threshold_sweep/seed_42/hotpotqa_open/_shared_seed42/timing/timing_manifest.json
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: hotpotqa_open, 500 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['prm_max_drop_fb_last', 'prm_below_threshold_fb_last']
+Sampling seed: 42
+NLL logprob batch size: 4
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Absolute PRM threshold: 0.8
+Checkpoint part /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_prm_threshold_sweep/seed_42/hotpotqa_open/_shared_seed42/checkpoint.jsonl: 32000 records
+Existing checkpoint union: 32000 records (0 local)
+Total drafts: 8000
+Total PRM records: 8000
+Total logprob records: 8000
+
+--- Phase 4: 64000 suffix generations ---
+  Shard 0 on GPU 0: 21334 tasks
+  Shard 1 on GPU 1: 21333 tasks
+  Shard 2 on GPU 2: 21333 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 342/342 [01:44<00:00,  3.27it/s, est. speed input: 5977.78 toks/s, output: 536.53 toks/s]
+[Seeded shard 0] suffix batch 42/42
+[Seeded shard 0] Done: 21334
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 341/341 [01:50<00:00,  3.08it/s, est. speed input: 5629.00 toks/s, output: 526.42 toks/s]
+[Seeded shard 1] suffix batch 42/42
+[Seeded shard 1] Done: 21333
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 341/341 [00:58<00:00,  5.87it/s, est. speed input: 10729.69 toks/s, output: 975.85 toks/s]
+[Seeded shard 2] suffix batch 42/42
+[Seeded shard 2] Done: 21333
+Total suffix records: 64000
+Total SC pool: 8000 drafts + 8000 fullsc = 16000
+Per-question timing: 64000/88000 task events
+  prm_below_threshold_fb_last: 0/500 complete questions, generation_mean=None, signal_mean=None
+  prm_max_drop_fb_last: 0/500 complete questions, generation_mean=None, signal_mean=None
+
+--- Evaluation ---
+
+--- Wall-clock provenance (current invocation) ---
+  draft      status=fully_reused tasks=0/8000 current=0.006s from_scratch=N/A
+  prm        status=fully_reused tasks=0/8000 current=0.005s from_scratch=N/A
+  nll        status=not_required tasks=0/0 current=0.006s from_scratch=N/A
+  gpt        status=not_required tasks=0/0 current=0.000s from_scratch=N/A
+  suffix     status=computed     tasks=64000/64000 current=3987.769s from_scratch=3987.769s
+  fullsc     status=fully_reused tasks=0/8000 current=0.020s from_scratch=N/A
+  Re-extracted answers for 80000 records
+  Loaded step token counts: 8000 drafts
+
+Method                                   Acc      Tok/Q     TotalTok
+--------------------------------------------------------------------
+Greedy@1                              0.2320        240      119,983
+SC@8                                  0.2980       1908      954,032
+SC@16                                 0.3180       3812    1,906,097
+SC@32                                 0.3300       7643    3,821,543
+rollback_prm_below_threshold_fb_last_nd4_ns8   0.3380       7048    3,523,883
+rollback_prm_below_threshold_fb_last_nd4_ns8_fair   0.3320       6281    3,140,275
+rollback_prm_below_threshold_fb_last_nd4_ns8_fair_new   0.3500       7048    3,523,883
+rollback_prm_below_threshold_fb_last_nd8_ns4   0.3300       8013    4,006,670
+rollback_prm_below_threshold_fb_last_nd8_ns4_fair   0.3340       6484    3,241,804
+rollback_prm_below_threshold_fb_last_nd8_ns4_fair_new   0.3160       8013    4,006,670
+rollback_prm_below_threshold_fb_last_nd16_ns2   0.3380       9929    4,964,650
+rollback_prm_below_threshold_fb_last_nd16_ns2_fair   0.3460       6862    3,431,083
+rollback_prm_below_threshold_fb_last_nd16_ns2_fair_new   0.3100       9929    4,964,650
+rollback_prm_max_drop_fb_last_nd4_ns8   0.3360       6539    3,269,498
+rollback_prm_max_drop_fb_last_nd4_ns8_fair   0.3380       5846    2,923,117
+rollback_prm_max_drop_fb_last_nd4_ns8_fair_new   0.3280       6539    3,269,498
+rollback_prm_max_drop_fb_last_nd8_ns4   0.3460       7461    3,730,303
+rollback_prm_max_drop_fb_last_nd8_ns4_fair   0.3400       6072    3,036,095
+rollback_prm_max_drop_fb_last_nd8_ns4_fair_new   0.3440       7461    3,730,303
+rollback_prm_max_drop_fb_last_nd16_ns2   0.3460       9396    4,697,990
+rollback_prm_max_drop_fb_last_nd16_ns2_fair   0.3400       6589    3,294,278
+rollback_prm_max_drop_fb_last_nd16_ns2_fair_new   0.3240       9396    4,697,990
+
+Saved: /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_prm_controls/seed_42/hotpotqa_open/eval_summary.json
+Figures saved to /home/youyang7/projects/LostInTheSecond/rebuttal/figures/qwen2.5_3b_instruct_prm_controls/seed_42/hotpotqa_open
+Saved table: /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_prm_controls/seed_42/hotpotqa_open/eval_summary_table.md
+Timing manifest: /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_prm_controls/seed_42/hotpotqa_open/timing/timing_manifest.json (current=4011.523s, from_scratch=None)
+Done.
+validated hotpotqa_open: 64000 suffixes, 18 control rows
+C32 PRM control experiment completed and validated: hotpotqa_open

@@ -1,0 +1,29 @@
+{
+  "experiment_name": "qwen2.5_3b_prm_control_experiments_seed42",
+  "pipeline": "rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py",
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "prm_model": "Qwen/Qwen2.5-Math-PRM-7B",
+  "seed": 42,
+  "budget": 32,
+  "nd": [4, 8, 16],
+  "signals": [
+    "prm_max_drop_fb_last",
+    "prm_below_threshold_fb_last"
+  ],
+  "absolute_prm_threshold": 0.8,
+  "gpus": "0,1,2",
+  "results_root": "rebuttal/results/qwen2.5_3b_instruct_prm_controls/seed_42",
+  "figures_root": "rebuttal/figures/qwen2.5_3b_instruct_prm_controls/seed_42",
+  "datasets": {
+    "math500": {
+      "n_sample": 500
+    },
+    "hotpotqa_open": {
+      "n_sample": 500
+    }
+  },
+  "shared_sources": {
+    "math500": "rebuttal/results/qwen2.5_3b_instruct_nll_prm_threshold_sweep/seed_42/math500/_shared_seed42",
+    "hotpotqa_open": "rebuttal/results/qwen2.5_3b_instruct_nll_prm_threshold_sweep/seed_42/hotpotqa_open/_shared_seed42"
+  }
+}

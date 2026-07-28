@@ -1,0 +1,138 @@
+command=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python -u /home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py --gpus 0,1,2 --model Qwen/Qwen2.5-3B-Instruct --prm-model Qwen/Qwen2.5-Math-PRM-7B --dataset gsm8k --budget 32 --n-sample 1319 --seed 42 --signals nll_drop_fb_last prm_drop_fb_last --prm-drop-threshold 0.05 --nll-drop-threshold 0.1 --logprob-batch-size 1 --nd 4 8 16 --skip-phase 25 4 --out-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42 --fig-dir /home/youyang7/projects/LostInTheSecond/rebuttal/figures/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42 --timing-mode auto --skip-eval
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Using the latest cached version of the dataset since openai/gsm8k couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'main' at /mnt/beegfs/youyang7/.cache/huggingface/datasets/openai___gsm8k/main/0.0.0/740312add88f781978c0658806c59bc2815b9866 (last modified on Sat May  2 17:38:48 2026).
+Dataset: gsm8k, 1319 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['nll_drop_fb_last', 'prm_drop_fb_last']
+Sampling seed: 42
+NLL logprob batch size: 1
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint union: 84416 records (84416 local)
+Total drafts: 21104
+Total PRM records: 21104
+Total logprob records: 21104
+Total suffix records: 0
+Total SC pool: 21104 drafts + 21104 fullsc = 42208
+Per-question timing: 21104/63312 task events
+  nll_drop_fb_last: 0/1319 complete questions, generation_mean=None, signal_mean=None
+  prm_drop_fb_last: 0/1319 complete questions, generation_mean=None, signal_mean=None
+Evaluation skipped (checkpoint preparation only).
+Timing manifest: /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42/timing/timing_manifest.json (current=11.142s, from_scratch=2700.0263240749996)
+shared fresh={"draft": 21104, "fullsc": 21104, "logprob": 21104, "prm": 21104}
+validated shared gsm8k: 42208 generation seeds
+
+=== gsm8k: nll_drop_fb_last threshold=0.1 ===
+reused suffix records=0
+command=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python -u /home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py --gpus 0,1,2 --model Qwen/Qwen2.5-3B-Instruct --prm-model Qwen/Qwen2.5-Math-PRM-7B --dataset gsm8k --budget 32 --n-sample 1319 --seed 42 --signals nll_drop_fb_last --prm-drop-threshold 0.05 --nll-drop-threshold 0.1 --logprob-batch-size 1 --nd 4 8 16 --skip-phase 1 2 25 3 5 --out-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/signals/nll_0p1 --fig-dir /home/youyang7/projects/LostInTheSecond/rebuttal/figures/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/signals/nll_0p1 --timing-mode auto --checkpoint-part /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42/checkpoint.jsonl --reuse-timing-manifest /mnt/beegfs/youyang7/projects/LostInTheSecond_rebuttal_artifacts/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42/timing/timing_manifest.json
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Using the latest cached version of the dataset since openai/gsm8k couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'main' at /mnt/beegfs/youyang7/.cache/huggingface/datasets/openai___gsm8k/main/0.0.0/740312add88f781978c0658806c59bc2815b9866 (last modified on Sat May  2 17:38:48 2026).
+Dataset: gsm8k, 1319 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['nll_drop_fb_last']
+Sampling seed: 42
+NLL logprob batch size: 1
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Checkpoint part /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42/checkpoint.jsonl: 84416 records
+Existing checkpoint union: 168832 records (84416 local)
+Total drafts: 21104
+Total PRM records: 21104
+Total logprob records: 21104
+Total suffix records: 84416
+Total SC pool: 21104 drafts + 21104 fullsc = 42208
+Per-question timing: 105520/147728 task events
+  nll_drop_fb_last: 0/1319 complete questions, generation_mean=None, signal_mean=None
+
+--- Evaluation ---
+
+--- Wall-clock provenance (current invocation) ---
+  draft      status=fully_reused tasks=0/21104 current=0.029s from_scratch=972.347s
+  prm        status=not_required tasks=0/0 current=0.027s from_scratch=N/A
+  nll        status=fully_reused tasks=0/21104 current=0.028s from_scratch=394.201s
+  gpt        status=not_required tasks=0/0 current=0.000s from_scratch=N/A
+  suffix     status=fully_reused tasks=0/84416 current=0.177s from_scratch=1884.940s
+  fullsc     status=fully_reused tasks=0/21104 current=0.030s from_scratch=892.992s
+  Re-extracted answers for 126624 records
+  Loaded step token counts: 21104 drafts
+
+Method                                   Acc      Tok/Q     TotalTok
+--------------------------------------------------------------------
+Greedy@1                              0.8514        295      388,849
+SC@8                                  0.8946       2380    3,138,821
+SC@16                                 0.9090       4752    6,267,901
+SC@32                                 0.9121       9504   12,535,714
+rollback_nll_drop_fb_last_nd4_ns8     0.9037       4104    5,413,525
+rollback_nll_drop_fb_last_nd4_ns8_fair   0.9052       3740    4,932,408
+rollback_nll_drop_fb_last_nd4_ns8_fair_new   0.9014       4104    5,413,525
+rollback_nll_drop_fb_last_nd8_ns4     0.9083       5314    7,009,544
+rollback_nll_drop_fb_last_nd8_ns4_fair   0.9075       4580    6,040,739
+rollback_nll_drop_fb_last_nd8_ns4_fair_new   0.9052       5314    7,009,544
+rollback_nll_drop_fb_last_nd16_ns2    0.9090       7671   10,118,106
+rollback_nll_drop_fb_last_nd16_ns2_fair   0.9075       6211    8,192,959
+rollback_nll_drop_fb_last_nd16_ns2_fair_new   0.9105       7671   10,118,106
+
+Saved: /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/signals/nll_0p1/eval_summary.json
+Figures saved to /home/youyang7/projects/LostInTheSecond/rebuttal/figures/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/signals/nll_0p1
+Saved table: /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/signals/nll_0p1/eval_summary_table.md
+Timing manifest: /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/signals/nll_0p1/timing/timing_manifest.json (current=17.836s, from_scratch=4147.339815274)
+Done.
+validated nll_0p1: 84416 suffixes
+
+=== gsm8k: prm_drop_fb_last threshold=0.05 ===
+reused suffix records=0
+command=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python -u /home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py --gpus 0,1,2 --model Qwen/Qwen2.5-3B-Instruct --prm-model Qwen/Qwen2.5-Math-PRM-7B --dataset gsm8k --budget 32 --n-sample 1319 --seed 42 --signals prm_drop_fb_last --prm-drop-threshold 0.05 --nll-drop-threshold 0.1 --logprob-batch-size 1 --nd 4 8 16 --skip-phase 1 2 25 3 5 --out-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/signals/prm_0p05 --fig-dir /home/youyang7/projects/LostInTheSecond/rebuttal/figures/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/signals/prm_0p05 --timing-mode auto --checkpoint-part /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42/checkpoint.jsonl --reuse-timing-manifest /mnt/beegfs/youyang7/projects/LostInTheSecond_rebuttal_artifacts/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42/timing/timing_manifest.json
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Using the latest cached version of the dataset since openai/gsm8k couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'main' at /mnt/beegfs/youyang7/.cache/huggingface/datasets/openai___gsm8k/main/0.0.0/740312add88f781978c0658806c59bc2815b9866 (last modified on Sat May  2 17:38:48 2026).
+Dataset: gsm8k, 1319 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['prm_drop_fb_last']
+Sampling seed: 42
+NLL logprob batch size: 1
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Checkpoint part /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42/checkpoint.jsonl: 84416 records
+Existing checkpoint union: 168832 records (84416 local)
+Total drafts: 21104
+Total PRM records: 21104
+Total logprob records: 21104
+Total suffix records: 84416
+Total SC pool: 21104 drafts + 21104 fullsc = 42208
+Per-question timing: 105520/147728 task events
+  prm_drop_fb_last: 0/1319 complete questions, generation_mean=None, signal_mean=None
+
+--- Evaluation ---
+
+--- Wall-clock provenance (current invocation) ---
+  draft      status=fully_reused tasks=0/21104 current=0.028s from_scratch=972.347s
+  prm        status=fully_reused tasks=0/21104 current=0.026s from_scratch=440.486s
+  nll        status=not_required tasks=0/0 current=0.028s from_scratch=N/A
+  gpt        status=not_required tasks=0/0 current=0.000s from_scratch=N/A
+  suffix     status=fully_reused tasks=0/84416 current=0.177s from_scratch=1727.412s
+  fullsc     status=fully_reused tasks=0/21104 current=0.029s from_scratch=892.992s
+  Re-extracted answers for 126624 records
+  Loaded step token counts: 21104 drafts
+
+Method                                   Acc      Tok/Q     TotalTok
+--------------------------------------------------------------------
+Greedy@1                              0.8514        295      388,849
+SC@8                                  0.8946       2380    3,138,821
+SC@16                                 0.9090       4752    6,267,901
+SC@32                                 0.9121       9504   12,535,714
+rollback_prm_drop_fb_last_nd4_ns8     0.9174       3399    4,483,147
+rollback_prm_drop_fb_last_nd4_ns8_fair   0.9174       3124    4,120,025
+rollback_prm_drop_fb_last_nd4_ns8_fair_new   0.9174       3399    4,483,147
+rollback_prm_drop_fb_last_nd8_ns4     0.9158       4602    6,070,448
+rollback_prm_drop_fb_last_nd8_ns4_fair   0.9143       4047    5,338,310
+rollback_prm_drop_fb_last_nd8_ns4_fair_new   0.9181       4602    6,070,448
+rollback_prm_drop_fb_last_nd16_ns2    0.9196       6965    9,186,635
+rollback_prm_drop_fb_last_nd16_ns2_fair   0.9158       5858    7,726,060
+rollback_prm_drop_fb_last_nd16_ns2_fair_new   0.9234       6965    9,186,635
+
+Saved: /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/signals/prm_0p05/eval_summary.json
+Figures saved to /home/youyang7/projects/LostInTheSecond/rebuttal/figures/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/signals/prm_0p05
+Saved table: /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/signals/prm_0p05/eval_summary_table.md
+Timing manifest: /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/signals/prm_0p05/timing/timing_manifest.json (current=15.917s, from_scratch=4035.9920157169995)
+Done.
+validated prm_0p05: 84416 suffixes
+aggregated gsm8k: 18 unique result rows

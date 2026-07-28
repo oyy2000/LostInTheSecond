@@ -1,0 +1,329 @@
+Host: c32
+Python: /mnt/beegfs/youyang7/.conda/envs/fact/bin/python
+Python 3.10.18
+Mon Jul 27 12:43:27 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:01:00.0 Off |                  Off |
+| 30%   50C    P2            124W /  250W |    1348MiB /  32760MiB |     59%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:02:00.0 Off |                  Off |
+| 32%   62C    P2            140W /  250W |    1346MiB /  32760MiB |     59%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:C1:00.0 Off |                  Off |
+| 36%   64C    P2            135W /  250W |    1346MiB /  32760MiB |     66%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
+|    1   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
+|    2   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
++-----------------------------------------------------------------------------------------+
+Model: meta-llama/Llama-3.2-3B-Instruct
+Datasets: math500 hotpotqa_open
+Thresholds: NLL=0.1, PRM=0.05
+Fresh run: drafts, PRM, vLLM NLL, suffixes, and SC@32
+SC@32: 16 stable drafts plus 16 new supplements per question
+Selected GPUs: 0,1,2
+command=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python -u /home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py --gpus 0,1,2 --model meta-llama/Llama-3.2-3B-Instruct --prm-model Qwen/Qwen2.5-Math-PRM-7B --dataset math500 --budget 32 --n-sample 500 --seed 42 --signals nll_drop_fb_last prm_drop_fb_last --prm-drop-threshold 0.05 --nll-drop-threshold 0.1 --logprob-batch-size 1 --nd 4 8 16 --skip-phase 25 4 --out-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/_shared_seed42 --fig-dir /home/youyang7/projects/LostInTheSecond/rebuttal/figures/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/_shared_seed42 --timing-mode auto --skip-eval
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: math500, 500 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['nll_drop_fb_last', 'prm_drop_fb_last']
+Sampling seed: 42
+NLL logprob batch size: 1
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Absolute PRM threshold: 0.8
+Existing checkpoint union: 0 records (0 local)
+
+--- Phase 1: 8000 drafts ---
+  Shard 0 on GPU 0: 2667 tasks
+  Shard 1 on GPU 1: 2667 tasks
+  Shard 2 on GPU 2: 2666 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 107/107 [01:37<00:00,  1.09it/s, est. speed input: 128.79 toks/s, output: 690.47 toks/s]
+[Seeded shard 0] draft batch 6/6
+[Seeded shard 0] Done: 2667
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 107/107 [01:39<00:00,  1.08it/s, est. speed input: 127.47 toks/s, output: 706.07 toks/s]
+[Seeded shard 1] draft batch 6/6
+[Seeded shard 1] Done: 2667
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 106/106 [00:52<00:00,  2.00it/s, est. speed input: 239.78 toks/s, output: 1303.67 toks/s]
+[Seeded shard 2] draft batch 6/6
+[Seeded shard 2] Done: 2666
+Total drafts: 8000
+
+--- Phase 2: 8000 PRM (Qwen/Qwen2.5-Math-PRM-7B) ---
+  Shard 0 on GPU 0: 2667 tasks
+  Shard 1 on GPU 1: 2667 tasks
+  Shard 2 on GPU 2: 2666 tasks
+  Shard 0 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 0] Done: 2667
+  Shard 1 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 1] Done: 2667
+  Shard 2 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 2] Done: 2666
+Total PRM records: 8000
+
+--- Phase 3: 8000 logprob ---
+  Shard 0 on GPU 0: 2667 tasks
+  Shard 1 on GPU 1: 2667 tasks
+  Shard 2 on GPU 2: 2666 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  9.30it/s, est. speed input: 5367.05 toks/s, output: 9.32 toks/s]
+[LP Shard 0] batch 2667/2667
+[LP Shard 0] Done: 2667
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 1/1 [00:00<00:00, 11.30it/s, est. speed input: 5373.61 toks/s, output: 11.31 toks/s]
+[LP Shard 1] batch 2667/2667
+[LP Shard 1] Done: 2667
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 1/1 [00:00<00:00, 46.88it/s, est. speed input: 5310.97 toks/s, output: 46.97 toks/s]
+[LP Shard 2] batch 2666/2666
+[LP Shard 2] Done: 2666
+Total logprob records: 8000
+Total suffix records: 0
+
+--- Phase 5: 8000 SC (supplement; 16 drafts reused) ---
+  Shard 0 on GPU 0: 2667 tasks
+  Shard 1 on GPU 1: 2667 tasks
+  Shard 2 on GPU 2: 2666 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 107/107 [01:34<00:00,  1.13it/s, est. speed input: 132.82 toks/s, output: 636.07 toks/s]
+[Seeded shard 0] fullsc batch 6/6
+[Seeded shard 0] Done: 2667
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 107/107 [01:35<00:00,  1.13it/s, est. speed input: 132.77 toks/s, output: 663.53 toks/s]
+[Seeded shard 1] fullsc batch 6/6
+[Seeded shard 1] Done: 2667
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 106/106 [00:49<00:00,  2.13it/s, est. speed input: 255.04 toks/s, output: 1211.73 toks/s]
+[Seeded shard 2] fullsc batch 6/6
+[Seeded shard 2] Done: 2666
+Total SC pool: 8000 drafts + 8000 fullsc = 16000
+Per-question timing: 24000/24000 task events
+  nll_drop_fb_last: 500/500 complete questions, generation_mean=101.81298183870315, signal_mean=1.0270661220550537
+  prm_drop_fb_last: 500/500 complete questions, generation_mean=101.81298183870315, signal_mean=1.2934726028442383
+Evaluation skipped (checkpoint preparation only).
+Timing manifest: /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/_shared_seed42/timing/timing_manifest.json (current=2155.672s, from_scratch=2152.86624173)
+command=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python -u /home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_1_recount_tokens.py --checkpoint /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/_shared_seed42/checkpoint.jsonl --model meta-llama/Llama-3.2-3B-Instruct
+Loading tokenizer: meta-llama/Llama-3.2-3B-Instruct
+Reading checkpoint: /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/_shared_seed42/checkpoint.jsonl
+Total draft records: 8000
+Saved 8000 entries to: /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/_shared_seed42/draft_step_tokens.json
+Token comparison: stored=4039283, recount=4031583, ratio=0.9981
+shared fresh={"draft": 8000, "fullsc": 8000, "logprob": 8000, "prm": 8000}
+validated shared math500: 16000 generation seeds
+
+=== math500: nll_drop_fb_last threshold=0.1 ===
+reused suffix records=0
+command=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python -u /home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py --gpus 0,1,2 --model meta-llama/Llama-3.2-3B-Instruct --prm-model Qwen/Qwen2.5-Math-PRM-7B --dataset math500 --budget 32 --n-sample 500 --seed 42 --signals nll_drop_fb_last --prm-drop-threshold 0.05 --nll-drop-threshold 0.1 --logprob-batch-size 1 --nd 4 8 16 --skip-phase 1 2 25 3 5 --out-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/signals/nll_0p1 --fig-dir /home/youyang7/projects/LostInTheSecond/rebuttal/figures/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/signals/nll_0p1 --timing-mode auto --checkpoint-part /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/_shared_seed42/checkpoint.jsonl --reuse-timing-manifest /mnt/beegfs/youyang7/projects/LostInTheSecond_rebuttal_artifacts/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/_shared_seed42/timing/timing_manifest.json
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: math500, 500 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['nll_drop_fb_last']
+Sampling seed: 42
+NLL logprob batch size: 1
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Absolute PRM threshold: 0.8
+Checkpoint part /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/_shared_seed42/checkpoint.jsonl: 32000 records
+Existing checkpoint union: 32000 records (0 local)
+Total drafts: 8000
+Total PRM records: 8000
+Total logprob records: 8000
+
+--- Phase 4: 32000 suffix generations ---
+  Shard 0 on GPU 0: 10667 tasks
+  Shard 1 on GPU 1: 10667 tasks
+  Shard 2 on GPU 2: 10666 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 427/427 [03:26<00:00,  2.07it/s, est. speed input: 864.17 toks/s, output: 843.14 toks/s]
+[Seeded shard 0] suffix batch 21/21
+[Seeded shard 0] Done: 10667
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 427/427 [03:17<00:00,  2.16it/s, est. speed input: 912.56 toks/s, output: 828.58 toks/s]
+[Seeded shard 1] suffix batch 21/21
+[Seeded shard 1] Done: 10667
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 426/426 [01:48<00:00,  3.93it/s, est. speed input: 1659.34 toks/s, output: 1514.94 toks/s]
+[Seeded shard 2] suffix batch 21/21
+[Seeded shard 2] Done: 10666
+Total suffix records: 32000
+Total SC pool: 8000 drafts + 8000 fullsc = 16000
+Per-question timing: 56000/56000 task events
+  nll_drop_fb_last: 500/500 complete questions, generation_mean=209.12215061998367, signal_mean=1.0270661220550537
+
+--- Evaluation ---
+
+--- Wall-clock provenance (current invocation) ---
+  draft      status=fully_reused tasks=0/8000 current=0.006s from_scratch=813.202s
+  prm        status=not_required tasks=0/0 current=0.005s from_scratch=N/A
+  nll        status=fully_reused tasks=0/8000 current=0.005s from_scratch=238.224s
+  gpt        status=not_required tasks=0/0 current=0.000s from_scratch=N/A
+  suffix     status=computed     tasks=32000/32000 current=2268.571s from_scratch=2268.571s
+  fullsc     status=fully_reused tasks=0/8000 current=0.012s from_scratch=836.244s
+  Re-extracted answers for 48000 records
+  Loaded step token counts: 8000 drafts
+
+Method                                   Acc      Tok/Q     TotalTok
+--------------------------------------------------------------------
+Greedy@1                              0.4220        482      241,239
+SC@8                                  0.5180       4022    2,011,044
+SC@16                                 0.5300       8079    4,039,283
+SC@32                                 0.5340      16204    8,102,057
+rollback_nll_drop_fb_last_nd4_ns8     0.5380      10551    5,275,339
+rollback_nll_drop_fb_last_nd4_ns8_fair   0.5360       9500    4,749,979
+rollback_nll_drop_fb_last_nd4_ns8_fair_new   0.5380      10551    5,275,339
+rollback_nll_drop_fb_last_nd8_ns4     0.5280      12653    6,326,452
+rollback_nll_drop_fb_last_nd8_ns4_fair   0.5300      10488    5,243,881
+rollback_nll_drop_fb_last_nd8_ns4_fair_new   0.5360      12653    6,326,452
+rollback_nll_drop_fb_last_nd16_ns2    0.5320      16659    8,329,378
+rollback_nll_drop_fb_last_nd16_ns2_fair   0.5400      12279    6,139,514
+rollback_nll_drop_fb_last_nd16_ns2_fair_new   0.5440      16659    8,329,378
+
+Saved: /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/signals/nll_0p1/eval_summary.json
+Figures saved to /home/youyang7/projects/LostInTheSecond/rebuttal/figures/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/signals/nll_0p1
+Saved table: /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/signals/nll_0p1/eval_summary_table.md
+Timing manifest: /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/signals/nll_0p1/timing/timing_manifest.json (current=2275.676s, from_scratch=4158.706368776)
+Done.
+validated nll_0p1: 32000 suffixes
+
+=== math500: prm_drop_fb_last threshold=0.05 ===
+reused suffix records=0
+command=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python -u /home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py --gpus 0,1,2 --model meta-llama/Llama-3.2-3B-Instruct --prm-model Qwen/Qwen2.5-Math-PRM-7B --dataset math500 --budget 32 --n-sample 500 --seed 42 --signals prm_drop_fb_last --prm-drop-threshold 0.05 --nll-drop-threshold 0.1 --logprob-batch-size 1 --nd 4 8 16 --skip-phase 1 2 25 3 5 --out-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/signals/prm_0p05 --fig-dir /home/youyang7/projects/LostInTheSecond/rebuttal/figures/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/signals/prm_0p05 --timing-mode auto --checkpoint-part /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/_shared_seed42/checkpoint.jsonl --reuse-timing-manifest /mnt/beegfs/youyang7/projects/LostInTheSecond_rebuttal_artifacts/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/_shared_seed42/timing/timing_manifest.json
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: math500, 500 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['prm_drop_fb_last']
+Sampling seed: 42
+NLL logprob batch size: 1
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Absolute PRM threshold: 0.8
+Checkpoint part /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/_shared_seed42/checkpoint.jsonl: 32000 records
+Existing checkpoint union: 32000 records (0 local)
+Total drafts: 8000
+Total PRM records: 8000
+Total logprob records: 8000
+
+--- Phase 4: 32000 suffix generations ---
+  Shard 0 on GPU 0: 10667 tasks
+  Shard 1 on GPU 1: 10667 tasks
+  Shard 2 on GPU 2: 10666 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 427/427 [03:26<00:00,  2.07it/s, est. speed input: 684.12 toks/s, output: 930.88 toks/s]
+[Seeded shard 0] suffix batch 21/21
+[Seeded shard 0] Done: 10667
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 427/427 [03:18<00:00,  2.15it/s, est. speed input: 737.40 toks/s, output: 995.65 toks/s]
+[Seeded shard 1] suffix batch 21/21
+[Seeded shard 1] Done: 10667
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 426/426 [01:53<00:00,  3.75it/s, est. speed input: 1341.00 toks/s, output: 1663.49 toks/s]
+[Seeded shard 2] suffix batch 21/21
+[Seeded shard 2] Done: 10666
+Total suffix records: 32000
+Total SC pool: 8000 drafts + 8000 fullsc = 16000
+Per-question timing: 56000/56000 task events
+  prm_drop_fb_last: 500/500 complete questions, generation_mean=198.8232586054802, signal_mean=1.2934726028442383
+
+--- Evaluation ---
+
+--- Wall-clock provenance (current invocation) ---
+  draft      status=fully_reused tasks=0/8000 current=0.007s from_scratch=813.202s
+  prm        status=fully_reused tasks=0/8000 current=0.005s from_scratch=265.197s
+  nll        status=not_required tasks=0/0 current=0.006s from_scratch=N/A
+  gpt        status=not_required tasks=0/0 current=0.000s from_scratch=N/A
+  suffix     status=computed     tasks=32000/32000 current=2294.923s from_scratch=2294.923s
+  fullsc     status=fully_reused tasks=0/8000 current=0.012s from_scratch=836.244s
+  Re-extracted answers for 48000 records
+  Loaded step token counts: 8000 drafts
+
+Method                                   Acc      Tok/Q     TotalTok
+--------------------------------------------------------------------
+Greedy@1                              0.4220        482      241,239
+SC@8                                  0.5180       4022    2,011,044
+SC@16                                 0.5300       8079    4,039,283
+SC@32                                 0.5340      16204    8,102,057
+rollback_prm_drop_fb_last_nd4_ns8     0.5520      11450    5,725,184
+rollback_prm_drop_fb_last_nd4_ns8_fair   0.5500      10257    5,128,721
+rollback_prm_drop_fb_last_nd4_ns8_fair_new   0.5520      11450    5,725,184
+rollback_prm_drop_fb_last_nd8_ns4     0.5560      13614    6,806,924
+rollback_prm_drop_fb_last_nd8_ns4_fair   0.5460      11221    5,610,312
+rollback_prm_drop_fb_last_nd8_ns4_fair_new   0.5620      13614    6,806,924
+rollback_prm_drop_fb_last_nd16_ns2    0.5580      17690    8,845,004
+rollback_prm_drop_fb_last_nd16_ns2_fair   0.5460      12832    6,415,811
+rollback_prm_drop_fb_last_nd16_ns2_fair_new   0.5560      17690    8,845,004
+
+Saved: /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/signals/prm_0p05/eval_summary.json
+Figures saved to /home/youyang7/projects/LostInTheSecond/rebuttal/figures/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/signals/prm_0p05
+Saved table: /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/signals/prm_0p05/eval_summary_table.md
+Timing manifest: /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/math500/signals/prm_0p05/timing/timing_manifest.json (current=2301.418s, from_scratch=4212.261822221)
+Done.
+validated prm_0p05: 32000 suffixes
+aggregated math500: 18 unique result rows
+command=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python -u /home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py --gpus 0,1,2 --model meta-llama/Llama-3.2-3B-Instruct --prm-model Qwen/Qwen2.5-Math-PRM-7B --dataset hotpotqa_open --budget 32 --n-sample 500 --seed 42 --signals nll_drop_fb_last prm_drop_fb_last --prm-drop-threshold 0.05 --nll-drop-threshold 0.1 --logprob-batch-size 1 --nd 4 8 16 --skip-phase 25 4 --out-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/hotpotqa_open/_shared_seed42 --fig-dir /home/youyang7/projects/LostInTheSecond/rebuttal/figures/llama_3.2_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/hotpotqa_open/_shared_seed42 --timing-mode auto --skip-eval
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: hotpotqa_open, 500 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['nll_drop_fb_last', 'prm_drop_fb_last']
+Sampling seed: 42
+NLL logprob batch size: 1
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Absolute PRM threshold: 0.8
+Existing checkpoint union: 0 records (0 local)
+
+--- Phase 1: 8000 drafts ---
+  Shard 0 on GPU 0: 2667 tasks
+  Shard 1 on GPU 1: 2667 tasks
+  Shard 2 on GPU 2: 2666 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 107/107 [00:49<00:00,  2.16it/s, est. speed input: 3161.78 toks/s, output: 372.54 toks/s]
+[Seeded shard 0] draft batch 6/6
+[Seeded shard 0] Done: 2667
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 107/107 [01:27<00:00,  1.23it/s, est. speed input: 1807.53 toks/s, output: 236.17 toks/s]
+[Seeded shard 1] draft batch 6/6
+[Seeded shard 1] Done: 2667
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 106/106 [00:24<00:00,  4.31it/s, est. speed input: 6261.87 toks/s, output: 732.85 toks/s]
+[Seeded shard 2] draft batch 6/6
+[Seeded shard 2] Done: 2666
+Total drafts: 8000
+
+--- Phase 2: 8000 PRM (Qwen/Qwen2.5-Math-PRM-7B) ---
+  Shard 0 on GPU 0: 2667 tasks
+  Shard 1 on GPU 1: 2667 tasks
+  Shard 2 on GPU 2: 2666 tasks
+  Shard 0 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 0] Done: 2667
+  Shard 1 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 1] Done: 2667
+  Shard 2 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 2] Done: 2666
+Total PRM records: 8000
+
+--- Phase 3: 8000 logprob ---
+  Shard 0 on GPU 0: 2667 tasks
+  Shard 1 on GPU 1: 2667 tasks
+  Shard 2 on GPU 2: 2666 tasks
+  Shard 0 exit=1: [rank0]: torch.OutOfMemoryError: Error in model execution (input dumped to /tmp/err_execute_model_input_20260727-145847.pkl): CUDA out of memory. Tried to allocate 3.85 GiB. GPU 0 has a total capacity of 31.47 GiB of which 3.02 GiB is free. Process 876153 has 1.30 GiB memory in use. Including non-PyTorch memory, this process has 27.12 GiB memory in use. Of the allocated memory 26.72 GiB is allocated by PyTorch, and 45.41 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+Processed prompts:   0%|          | 0/1 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]
+elf._run_engine(use_tqdm=use_tqdm)
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/entrypoints/llm.py", line 879, in _run_engine
+[rank0]:     step_outputs = self.llm_engine.step()
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/engine/llm_engine.py", line 1386, in step
+[rank0]:     outputs = self.model_executor.execute_model(
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/executor/gpu_executor.py", line 134, in execute_model
+[rank0]:     output = self.driver_worker.execute_model(execute_model_req)
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/worker/worker_base.py", line 327, in execute_model
+[rank0]:     output = self.model_runner.execute_model(
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+[rank0]:     return func(*args, **kwargs)
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/worker/model_runner_base.py", line 152, in _wrapper
+[rank0]:     raise type(err)(
+[rank0]: torch.OutOfMemoryError: Error in model execution (input dumped to /tmp/err_execute_model_input_20260727-145847.pkl): CUDA out of memory. Tried to allocate 3.85 GiB. GPU 0 has a total capacity of 31.47 GiB of which 3.02 GiB is free. Process 876153 has 1.30 GiB memory in use. Including non-PyTorch memory, this process has 27.12 GiB memory in use. Of the allocated memory 26.72 GiB is allocated by PyTorch, and 45.41 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+Processed prompts:   0%|          | 0/1 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]
+

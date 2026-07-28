@@ -1,0 +1,24 @@
+{
+  "Qwen2.5-3B_GSM8K": {
+    "logprob_drop": {
+      "best_hit1": 1.0,
+      "ftr_at_best": 3.871212121212121
+    },
+    "min_logprob": {
+      "best_hit1": 1.0,
+      "ftr_at_best": 4.211489898989899
+    },
+    "entropy_delta": {
+      "best_hit1": 1.0,
+      "ftr_at_best": 4.6767676767676765
+    },
+    "mean_entropy": {
+      "best_hit1": 1.0,
+      "ftr_at_best": 4.671085858585859
+    },
+    "combo_score": {
+      "best_hit1": 1.0,
+      "ftr_at_best": 4.668560606060606
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "prm_model": "Qwen/Qwen2.5-Math-PRM-7B",
+  "signals": [
+    "nll_drop_fb_last",
+    "prm_drop_fb_last"
+  ],
+  "thresholds": {
+    "nll_drop_fb_last": 0.1,
+    "prm_drop_fb_last": 0.095
+  },
+  "budget": 32,
+  "nd": [
+    4,
+    8,
+    16
+  ],
+  "dataset_seed": 42,
+  "generation_seed": null,
+  "temperature": 0.7,
+  "top_p": 0.95,
+  "max_tokens": 2048,
+  "max_model_len": 4096,
+  "nll_batch_size": 1,
+  "nll_backend": "transformers",
+  "nll_logprob_chunk_size": 64,
+  "generation_batch_size": 512,
+  "gpus": "0,1,2",
+  "source_results_root": "rebuttal/results/qwen2.5_3b_instruct_seed_variance",
+  "results_root": "rebuttal/results/qwen2.5_3b_instruct_seed_variance",
+  "datasets": {
+    "math500": {
+      "n_sample": 500,
+      "gpu_memory_utilization": 0.32,
+      "nll_gpu_memory_utilization": 0.19,
+      "nll_min_free_memory_mib": 12000,
+      "nll_tensor_parallel_size": 1,
+      "prm_tensor_parallel_size": 3,
+      "prm_max_memory_per_gpu_gib": 10
+    },
+    "hotpotqa_open": {
+      "n_sample": 500,
+      "gpu_memory_utilization": 0.32,
+      "nll_gpu_memory_utilization": 0.19,
+      "nll_min_free_memory_mib": 12000,
+      "nll_tensor_parallel_size": 1,
+      "prm_tensor_parallel_size": 3,
+      "prm_max_memory_per_gpu_gib": 10
+    }
+  }
+}

@@ -1,0 +1,48 @@
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Using the latest cached version of the dataset since scholarly-shadows-syndicate/2WikiMultiHopQA couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /mnt/beegfs/youyang7/.cache/huggingface/datasets/scholarly-shadows-syndicate___2_wiki_multi_hop_qa/default/0.0.0/612bc5039a457880d9e7d84c3b0a4cf154b70e4f (last modified on Wed May  6 14:32:04 2026).
+Dataset: 2wikimultihopqa_open, 1000 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['nll_drop_fb_last', 'prm_drop_fb_last']
+Sampling seed: 42
+NLL logprob batch size: 1
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint union: 32000 records (32000 local)
+Total drafts: 16000
+Total PRM records: 16000
+
+--- Phase 3: 16000 logprob ---
+  Shard 0 on GPU 0: 5334 tasks
+  Shard 1 on GPU 1: 5333 tasks
+  Shard 2 on GPU 2: 5333 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  3.29it/s, est. speed input: 5667.64 toks/s, output: 3.29 toks/s]
+[LP Shard 0] batch 5334/5334
+[LP Shard 0] Done: 5334
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  3.15it/s, est. speed input: 5678.14 toks/s, output: 3.16 toks/s]
+[LP Shard 1] batch 5333/5333
+[LP Shard 1] Done: 5333
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  5.49it/s, est. speed input: 10079.99 toks/s, output: 5.49 toks/s]
+[LP Shard 2] batch 5333/5333
+[LP Shard 2] Done: 5333
+Total logprob records: 16000
+Total suffix records: 0
+
+--- Phase 5: 16000 SC (supplement; 16 drafts reused) ---
+  Shard 0 on GPU 0: 5334 tasks
+  Shard 1 on GPU 1: 5333 tasks
+  Shard 2 on GPU 2: 5333 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 214/214 [01:47<00:00,  1.99it/s, est. speed input: 1983.34 toks/s, output: 494.81 toks/s]
+[Seeded shard 0] fullsc batch 11/11
+[Seeded shard 0] Done: 5334
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 213/213 [01:39<00:00,  2.13it/s, est. speed input: 2132.41 toks/s, output: 511.24 toks/s]
+[Seeded shard 1] fullsc batch 11/11
+[Seeded shard 1] Done: 5333
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 213/213 [00:48<00:00,  4.40it/s, est. speed input: 4405.76 toks/s, output: 1033.45 toks/s]
+[Seeded shard 2] fullsc batch 11/11
+[Seeded shard 2] Done: 5333
+Total SC pool: 16000 drafts + 16000 fullsc = 32000
+Per-question timing: 16000/48000 task events
+  nll_drop_fb_last: 0/1000 complete questions, generation_mean=None, signal_mean=None
+  prm_drop_fb_last: 0/1000 complete questions, generation_mean=None, signal_mean=None
+Evaluation skipped (checkpoint preparation only).
+Timing manifest: rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/2wikimultihopqa_open/_shared_seed42/timing/timing_manifest.json (current=2059.936s, from_scratch=None)

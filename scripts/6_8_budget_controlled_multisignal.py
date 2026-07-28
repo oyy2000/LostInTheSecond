@@ -12,6 +12,10 @@ Signals:
         Live GPT API call to locate first-error step (tau).
   - prm_drop / prm_drop_fb_last / prm_drop_fb_start:
         First i where score[i]-score[i+1] > threshold.
+  - prm_max_drop_fb_last:
+        Step with the largest adjacent PRM decrease.
+  - prm_below_threshold_fb_last:
+        First step whose absolute PRM score is below a threshold.
   - nll_drop / nll_drop_fb_last / nll_drop_fb_start:
         First i where nll[i]-nll[i-1] > threshold.
 
@@ -44,6 +48,7 @@ DATASET = "gsm8k"
 PYTHON = sys.executable
 
 PRM_DROP_THRESHOLD = 0.1
+PRM_ABSOLUTE_THRESHOLD = 0.8
 NLL_DROP_THRESHOLD = 0.2
 TEMPERATURE = 0.7
 TOP_P = 0.95
@@ -56,6 +61,7 @@ ROLLBACK_CONFIGS = [(1, 32), (2, 16), (4, 8), (8, 4), (16, 2)]
 ALL_SIGNALS = [
     "gpt_fb_last", "gpt_fb_start",
     "prm_drop", "prm_drop_fb_last", "prm_drop_fb_start",
+    "prm_max_drop_fb_last", "prm_below_threshold_fb_last",
     "nll_drop", "nll_drop_fb_last", "nll_drop_fb_start",
 ]
 
@@ -66,12 +72,29 @@ from src.prompt_templates import (
     build_prompt, get_stop_tokens, split_steps,
     extract_answer, check_answer,
 )
+from src.hotpotqa_answer_equiv import hotpotqa_f1
 from src.sweep_datasets import load_dataset_by_name
 from src.step_judge import (
     build_first_error_prompt,
     call_gpt_first_error,
     load_env_file,
     make_client,
+)
+from rebuttal.src.prm_control_strategies import (
+    MAX_PRM_DROP_SIGNAL,
+    PRM_BELOW_THRESHOLD_SIGNAL,
+    max_prm_drop_assignment,
+    prm_below_threshold_assignment,
+)
+from rebuttal.src.wallclock import (
+    RunTimingRecorder,
+    WorkerTiming,
+    discover_task_event_store,
+    discover_timing_manifest,
+    load_manifest,
+    publish_per_question_timings,
+    task_event_store_for_manifest,
+    write_generic_worker_timing,
 )
 
 
@@ -93,11 +116,29 @@ def parse_args():
                     help="Which rollback signals to evaluate")
     ap.add_argument("--prm-drop-threshold", type=float,
                     default=PRM_DROP_THRESHOLD)
+    ap.add_argument(
+        "--prm-absolute-threshold",
+        type=float,
+        default=PRM_ABSOLUTE_THRESHOLD,
+        help=(
+            "Absolute PRM score threshold used by "
+            "prm_below_threshold_fb_last"
+        ),
+    )
     ap.add_argument("--prm-model", type=str, default=PRM_MODEL_ID,
                     help="PRM model ID (supports Qwen2.5-Math-PRM-7B "
                          "and Skywork-o1-Open-PRM-Qwen-2.5-1.5B)")
     ap.add_argument("--nll-drop-threshold", type=float,
                     default=NLL_DROP_THRESHOLD)
+    ap.add_argument(
+        "--logprob-batch-size",
+        type=int,
+        default=4,
+        help=(
+            "Per-GPU batch size for vLLM prompt-logprob scoring. "
+            "Use a smaller value for long responses or constrained GPUs."
+        ),
+    )
     ap.add_argument("--gpt-model", type=str, default=GPT_MODEL,
                     help="GPT model for first-error detection")
     ap.add_argument("--gpt-max-workers", type=int,
@@ -105,6 +146,9 @@ def parse_args():
     ap.add_argument("--gpt-temperature", type=float, default=0.0)
     ap.add_argument("--tag", default="")
     ap.add_argument("--out-dir", default="")
+    ap.add_argument("--fig-dir", default="",
+                    help="Directory for generated figures "
+                         "(default: figures/budget_multisignal[_tag])")
     ap.add_argument("--gpt-cache", default="",
                     help="Path to gpt_first_error_cache.jsonl "
                          "(used as warm-start; new calls appended)")
@@ -114,13 +158,50 @@ def parse_args():
     ap.add_argument("--skip-phase", type=int, nargs="*", default=[],
                     help="Skip phases (1=drafts, 2=PRM, 25=GPT, "
                          "3=logprob, 4=suffix, 5=SC)")
+    ap.add_argument(
+        "--skip-eval",
+        action="store_true",
+        help=(
+            "Prepare/cache checkpoint records without writing evaluation "
+            "summaries or figures; stale evaluation artifacts are removed"
+        ),
+    )
     ap.add_argument("--draft-checkpoint", default="",
                     help="Path to an existing checkpoint.jsonl to "
                          "import draft records from (reuse drafts "
                          "without regenerating)")
+    ap.add_argument(
+        "--checkpoint-part",
+        action="append",
+        default=[],
+        help=(
+            "Read records from an additional immutable checkpoint JSONL. "
+            "May be specified multiple times; newly generated records are "
+            "written only to OUT_DIR/checkpoint.jsonl"
+        ),
+    )
     ap.add_argument("--seed", type=int, default=None,
                     help="Random seed for vLLM sampling "
                          "(None = non-deterministic)")
+    ap.add_argument(
+        "--timing-mode",
+        choices=("auto", "fresh", "eval-only"),
+        default="auto",
+        help=(
+            "Wall-clock provenance mode. auto permits checkpoint reuse; "
+            "fresh requires an empty checkpoint; eval-only labels an "
+            "offline evaluation invocation"
+        ),
+    )
+    ap.add_argument(
+        "--reuse-timing-manifest",
+        action="append",
+        default=[],
+        help=(
+            "Timing manifest associated with a reused checkpoint. May be "
+            "specified multiple times"
+        ),
+    )
     ap.add_argument("--_shard-id", type=int, default=-1)
     ap.add_argument("--_task-file", default="")
     ap.add_argument("--_gpu", default="0")
@@ -129,7 +210,58 @@ def parse_args():
     ap.add_argument("--_prm-model-id", default=PRM_MODEL_ID)
     ap.add_argument("--_logprob", action="store_true")
     ap.add_argument("--_seed", type=int, default=-1)
+    ap.add_argument("--_timing-file", default="")
+    ap.add_argument("--_timing-phase", default="")
+    ap.add_argument("--_timing-run-id", default="")
     return ap.parse_args()
+
+
+def checkpoint_record_identity(record):
+    """Return the identity used to merge immutable checkpoint parts."""
+    task_type = record["task_type"]
+    if task_type in {"draft", "prm", "nll", "logprob"}:
+        return (
+            task_type,
+            record["doc_id"],
+            int(record.get("draft_idx", 0)),
+        )
+    if task_type == "suffix":
+        return (
+            task_type,
+            record["doc_id"],
+            int(record["draft_idx"]),
+            record.get("strategy", "prm_drop"),
+            int(record["rollback_step"]),
+            int(record["suffix_idx"]),
+        )
+    if task_type == "fullsc":
+        return task_type, record["doc_id"], int(record["sc_idx"])
+    raise ValueError(
+        f"Unsupported checkpoint record type: {task_type!r}"
+    )
+
+
+def read_checkpoint_records(path):
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    with path.open(encoding="utf-8") as handle:
+        return [
+            json.loads(line) for line in handle if line.strip()
+        ]
+
+
+def make_worker_timing(args, tasks, default_phase):
+    timing_path = getattr(args, "_timing_file", "")
+    if not timing_path:
+        return None
+    return WorkerTiming(
+        path=Path(timing_path),
+        phase=getattr(args, "_timing_phase", "") or default_phase,
+        run_id=getattr(args, "_timing_run_id", "") or "untracked",
+        shard_id=args._shard_id,
+        gpu_id=args._gpu,
+        tasks=tasks,
+    )
 
 
 # SECTION: shard_worker
@@ -142,9 +274,11 @@ def run_shard(args):
 
     tasks = json.loads(Path(args._task_file).read_text("utf-8"))
     sid = args._shard_id
+    timing = make_worker_timing(args, tasks, "generation")
     print(f"[Shard {sid}] GPU {args._gpu}: {len(tasks)} tasks")
 
     stop = get_stop_tokens(MODEL_ID)
+    model_load_started_ns = time.perf_counter_ns()
     llm = LLM(
         model=MODEL_ID, tensor_parallel_size=1,
         trust_remote_code=True, dtype="half",
@@ -153,6 +287,8 @@ def run_shard(args):
         enforce_eager=True,
     )
     tokenizer = llm.get_tokenizer()
+    if timing is not None:
+        timing.record_model_load(model_load_started_ns)
     sp_s = SamplingParams(
         temperature=TEMPERATURE, top_p=TOP_P,
         max_tokens=MAX_TOKENS, stop=stop,
@@ -169,15 +305,20 @@ def run_shard(args):
             continue
         for bi in range(0, len(idxs), 512):
             chunk = idxs[bi:bi + 512]
+            batch_started_ns = time.perf_counter_ns()
+            batch_started_unix_sec = time.time()
             pids = [tokenizer.encode(tasks[i]["prompt"],
                                      add_special_tokens=False)
                     for i in chunk]
             outs = llm.generate(
                 [{"prompt_token_ids": p} for p in pids],
                 sampling_params=sp_s)
+            batch_finished_unix_sec = time.time()
+            batch_generated_tokens = 0
             for idx, o in zip(chunk, outs):
                 text = o.outputs[0].text
                 toks = len(o.outputs[0].token_ids)
+                batch_generated_tokens += toks
                 t = tasks[idx]
                 rec = {k: t[k] for k in t if k != "prompt"}
                 if ttype == "draft":
@@ -196,6 +337,24 @@ def run_shard(args):
                                sc_tokens=toks)
                 rec["task_type"] = ttype
                 results[idx] = rec
+                if timing is not None:
+                    timing.record_vllm_request(
+                        t,
+                        o,
+                        fallback_started_unix_sec=(
+                            batch_started_unix_sec
+                        ),
+                        fallback_finished_unix_sec=(
+                            batch_finished_unix_sec
+                        ),
+                    )
+            if timing is not None:
+                timing.record_batch(
+                    [tasks[index] for index in chunk],
+                    batch_started_ns,
+                    generated_tokens=batch_generated_tokens,
+                    input_tokens=sum(len(ids) for ids in pids),
+                )
             print(f"[Shard {sid}] {ttype} batch "
                   f"{bi//512+1}/{(len(idxs)+511)//512}")
 
@@ -205,6 +364,8 @@ def run_shard(args):
             for r in results:
                 if r is not None:
                     f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    if timing is not None:
+        timing.finish()
     print(f"[Shard {sid}] Done: {sum(1 for r in results if r)}")
 
 
@@ -224,18 +385,23 @@ def run_prm_shard(args):
 
     tasks = json.loads(Path(args._task_file).read_text("utf-8"))
     sid = args._shard_id
+    timing = make_worker_timing(args, tasks, "prm")
     print(f"[PRM Shard {sid}] GPU {args._gpu}: {len(tasks)} tasks")
 
+    model_load_started_ns = time.perf_counter_ns()
     prm_tok = ATK.from_pretrained(
         PRM_MODEL_ID, trust_remote_code=True)
     prm_model = AutoModel.from_pretrained(
         PRM_MODEL_ID, device_map={"": "cuda:0"},
         torch_dtype=torch.bfloat16, trust_remote_code=True,
     ).eval()
+    if timing is not None:
+        timing.record_model_load(model_load_started_ns)
     step_sep_id = prm_tok.encode("<extra_0>")[0]
 
     results = [None] * len(tasks)
     for idx, t in enumerate(tasks):
+        task_started_unix_sec = time.time()
         conv = prm_tok.apply_chat_template(
             t["prompt"], tokenize=False,
             add_generation_prompt=False)
@@ -250,10 +416,18 @@ def run_prm_shard(args):
         sample = probs[0]
         pos = sample[sample != 0].view(-1, 2)[:, 1]
         scores = pos.cpu().tolist()
+        task_finished_unix_sec = time.time()
         rec = {k: t[k] for k in t if k != "prompt"}
         rec["step_scores"] = [round(s, 6) for s in scores]
         rec["prm_tokens"] = int(input_ids.shape[1])
         results[idx] = rec
+        if timing is not None:
+            timing.record_task(
+                t,
+                started_unix_sec=task_started_unix_sec,
+                finished_unix_sec=task_finished_unix_sec,
+                timing_source="single_task_wall",
+            )
 
     out_path = Path(tasks[0]["_out"]) if tasks else None
     if out_path:
@@ -261,6 +435,8 @@ def run_prm_shard(args):
             for r in results:
                 if r is not None:
                     f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    if timing is not None:
+        timing.finish()
     print(f"[PRM Shard {sid}] Done: "
           f"{sum(1 for r in results if r)}")
 
@@ -280,6 +456,7 @@ def run_skywork_prm_shard(args):
 
     tasks = json.loads(Path(args._task_file).read_text("utf-8"))
     sid = args._shard_id
+    timing = make_worker_timing(args, tasks, "prm")
     print(f"[Skywork PRM Shard {sid}] GPU {args._gpu}: "
           f"{len(tasks)} tasks")
 
@@ -294,6 +471,7 @@ def run_skywork_prm_shard(args):
     from transformers import AutoTokenizer as ATK
 
     prm_model_id = args._prm_model_id
+    model_load_started_ns = time.perf_counter_ns()
     tokenizer = ATK.from_pretrained(
         prm_model_id, trust_remote_code=True,
         use_safetensors=True)
@@ -301,11 +479,14 @@ def run_skywork_prm_shard(args):
         prm_model_id, device_map={"": "cuda:0"},
         torch_dtype=torch.bfloat16,
     ).eval()
+    if timing is not None:
+        timing.record_model_load(model_load_started_ns)
 
     BATCH = 8
     results = [None] * len(tasks)
     for bi in range(0, len(tasks), BATCH):
         batch = tasks[bi:bi + BATCH]
+        batch_started_unix_sec = time.time()
         batch_input_ids = []
         batch_flags = []
         for t in batch:
@@ -344,6 +525,8 @@ def run_skywork_prm_shard(args):
                 return_probs=True,
             )
         step_rewards = derive_step_rewards(rewards, padded_flags)
+        torch.cuda.synchronize()
+        batch_finished_unix_sec = time.time()
 
         for j, t in enumerate(batch):
             idx = bi + j
@@ -353,6 +536,13 @@ def run_skywork_prm_shard(args):
             rec["step_scores"] = [round(s, 6) for s in scores]
             rec["prm_tokens"] = len(batch_input_ids[j])
             results[idx] = rec
+            if timing is not None:
+                timing.record_task(
+                    t,
+                    started_unix_sec=batch_started_unix_sec,
+                    finished_unix_sec=batch_finished_unix_sec,
+                    timing_source="shared_batch_wall",
+                )
 
         print(f"[Skywork PRM Shard {sid}] batch "
               f"{bi // BATCH + 1}/"
@@ -365,6 +555,8 @@ def run_skywork_prm_shard(args):
                 if r is not None:
                     f.write(json.dumps(r, ensure_ascii=False)
                             + "\n")
+    if timing is not None:
+        timing.finish()
     print(f"[Skywork PRM Shard {sid}] Done: "
           f"{sum(1 for r in results if r)}")
 
@@ -373,63 +565,131 @@ def run_skywork_prm_shard(args):
 
 
 def run_logprob_shard(args):
-    """Collect per-token logprobs for NLL signal."""
+    """Collect per-token logprobs for NLL signal with vLLM."""
     os.environ["CUDA_VISIBLE_DEVICES"] = args._gpu
     from vllm import LLM, SamplingParams
 
     tasks = json.loads(Path(args._task_file).read_text("utf-8"))
     sid = args._shard_id
+    timing = make_worker_timing(args, tasks, "nll")
     print(f"[LP Shard {sid}] GPU {args._gpu}: {len(tasks)} tasks")
+    gpu_memory_utilization = float(
+        os.environ.get("LOGPROB_GPU_MEMORY_UTILIZATION", "0.60")
+    )
+    if not 0.0 < gpu_memory_utilization < 1.0:
+        raise ValueError(
+            "LOGPROB_GPU_MEMORY_UTILIZATION must be between 0 and 1"
+        )
+    max_input_tokens = int(
+        os.environ.get("LOGPROB_MAX_INPUT_TOKENS", str(MAX_MODEL_LEN))
+    )
+    if max_input_tokens <= 0:
+        raise ValueError(
+            "LOGPROB_MAX_INPUT_TOKENS must be positive"
+        )
+    print(
+        f"[LP Shard {sid}] gpu_memory_utilization="
+        f"{gpu_memory_utilization}, "
+        f"max_input_tokens={max_input_tokens}"
+    )
 
+    model_load_started_ns = time.perf_counter_ns()
     llm = LLM(
         model=MODEL_ID, tensor_parallel_size=1,
         trust_remote_code=True, dtype="half",
-        gpu_memory_utilization=0.60,
-        max_model_len=2048,
+        gpu_memory_utilization=gpu_memory_utilization,
+        max_model_len=max_input_tokens + 1,
         enforce_eager=True,
     )
     tokenizer = llm.get_tokenizer()
+    if timing is not None:
+        timing.record_model_load(model_load_started_ns)
     sp = SamplingParams(
         temperature=0.0, max_tokens=1, prompt_logprobs=1)
-    BATCH = 8
+    batch_size = args.logprob_batch_size
+    if batch_size <= 0:
+        raise ValueError("--logprob-batch-size must be positive")
     results = [None] * len(tasks)
-    for bi in range(0, len(tasks), BATCH):
-        batch = tasks[bi:bi + BATCH]
-        prompts = [t["full_prompt"] for t in batch]
-        outputs = llm.generate(prompts, sp)
-        for ti, (task, output) in enumerate(
-                zip(batch, outputs)):
+    for bi in range(0, len(tasks), batch_size):
+        batch = tasks[bi:bi + batch_size]
+        batch_started_ns = time.perf_counter_ns()
+        batch_started_unix_sec = time.time()
+        encodings = [
+            tokenizer(
+                task["full_prompt"],
+                add_special_tokens=False,
+                return_offsets_mapping=True,
+            )
+            for task in batch
+        ]
+        prompt_token_ids = [
+            encoding["input_ids"] for encoding in encodings
+        ]
+        too_long = [
+            len(ids) for ids in prompt_token_ids
+            if len(ids) > max_input_tokens
+        ]
+        if too_long:
+            raise ValueError(
+                "NLL inputs exceed "
+                f"max_input_tokens={max_input_tokens}: "
+                f"{too_long[:3]}"
+            )
+        outputs = llm.generate(
+            [{"prompt_token_ids": ids} for ids in prompt_token_ids],
+            sampling_params=sp,
+        )
+        batch_finished_unix_sec = time.time()
+        for ti, (task, encoding, output) in enumerate(
+                zip(batch, encodings, outputs)):
             rec = {k: v for k, v in task.items()
                    if k not in ("full_prompt",)}
             resp_off = task["resp_char_offset"]
+            if output.prompt_logprobs is None:
+                raise ValueError(
+                    f"{task['doc_id']}|{task['draft_idx']}: "
+                    "prompt_logprobs is missing"
+                )
             lps, offsets = [], []
-            cum = 0
-            if output.prompt_logprobs is not None:
-                ptids = output.prompt_token_ids
-                for pi, lp_dict in enumerate(
-                        output.prompt_logprobs):
-                    if lp_dict is None:
-                        tok_id = ptids[pi]
-                        decoded = tokenizer.decode([tok_id])
-                        cum += len(decoded)
-                        continue
-                    tok_id = ptids[pi]
-                    if tok_id in lp_dict:
-                        lpo = lp_dict[tok_id]
-                    else:
-                        lpo = next(iter(lp_dict.values()))
-                    decoded = lpo.decoded_token or ""
-                    cpos = cum
-                    cum += len(decoded)
-                    if cpos >= resp_off:
-                        lps.append(lpo.logprob)
-                        offsets.append(cpos - resp_off)
+            for token_id, token_span, lp_dict in zip(
+                    output.prompt_token_ids,
+                    encoding["offset_mapping"],
+                    output.prompt_logprobs):
+                start_char, end_char = token_span
+                if end_char <= resp_off:
+                    continue
+                if lp_dict is None or token_id not in lp_dict:
+                    raise ValueError(
+                        f"{task['doc_id']}|{task['draft_idx']}: "
+                        "actual response token logprob is missing"
+                    )
+                lps.append(float(lp_dict[token_id].logprob))
+                offsets.append(max(0, start_char - resp_off))
             rec["token_logprobs"] = lps
             rec["token_offsets"] = offsets
             rec["task_type"] = "logprob"
+            rec["scoring_backend"] = "vllm"
+            rec["input_tokens"] = len(encoding["input_ids"])
+            rec["response_scored_tokens"] = len(lps)
             results[bi + ti] = rec
+            if timing is not None:
+                timing.record_vllm_request(
+                    task,
+                    output,
+                    fallback_started_unix_sec=batch_started_unix_sec,
+                    fallback_finished_unix_sec=batch_finished_unix_sec,
+                )
+        if timing is not None:
+            timing.record_batch(
+                batch,
+                batch_started_ns,
+                input_tokens=sum(
+                    len(ids) for ids in prompt_token_ids
+                ),
+            )
         print(f"[LP Shard {sid}] batch "
-              f"{bi//BATCH+1}/{(len(tasks)+BATCH-1)//BATCH}")
+              f"{bi // batch_size + 1}/"
+              f"{(len(tasks) + batch_size - 1) // batch_size}")
 
     out_path = Path(tasks[0]["_out"]) if tasks else None
     if out_path:
@@ -438,6 +698,8 @@ def run_logprob_shard(args):
                 if r is not None:
                     f.write(json.dumps(r, ensure_ascii=False)
                             + "\n")
+    if timing is not None:
+        timing.finish()
     print(f"[LP Shard {sid}] Done: "
           f"{sum(1 for r in results if r)}")
 
@@ -489,14 +751,35 @@ def _wait_for_free_gpu(
         time.sleep(GPU_POLL_INTERVAL)
 
 
+def _vllm_port_for_worker(shard_id: int) -> int:
+    """Return a process-specific base port for concurrent vLLM workers."""
+    return 20000 + (
+        (os.getpid() % 1000) * 32 + shard_id * 8
+    ) % 40000
+
+
 # SECTION: launch_shards
 
 
 def launch_shards(tasks, gpu_ids, shard_dir, prm=False,
                   logprob=False, skywork_prm=False,
-                  prm_model_id=None, seed=None):
+                  prm_model_id=None, seed=None, *,
+                  logprob_batch_size=4,
+                  phase_name="", timing_recorder=None,
+                  return_stats=False):
     if not tasks:
-        return []
+        empty_stats = {
+            "phase": phase_name,
+            "tasks_executed": 0,
+            "gpu_wait_sec": 0.0,
+            "launcher_wall_sec": 0.0,
+            "worker_wall_sec_max": 0.0,
+            "gpu_seconds_sum": 0.0,
+            "worker_vllm_ports": {},
+            "worker_timing_files": [],
+        }
+        return ([], empty_stats) if return_stats else []
+    launch_started_ns = time.perf_counter_ns()
     shard_dir.mkdir(parents=True, exist_ok=True)
     ns = len(gpu_ids)
     shards = [[] for _ in range(ns)]
@@ -514,6 +797,9 @@ def launch_shards(tasks, gpu_ids, shard_dir, prm=False,
     busy: Dict[str, subprocess.Popen] = {}
     all_procs: List[Tuple[int, str, subprocess.Popen, Any]] = []
     out_files = []
+    worker_timing_files = []
+    worker_vllm_ports = {}
+    gpu_wait_sec = 0.0
 
     for si in range(ns):
         if not shards[si]:
@@ -524,7 +810,11 @@ def launch_shards(tasks, gpu_ids, shard_dir, prm=False,
         tf.write_text(json.dumps(shards[si]), encoding="utf-8")
         out_files.append(shard_dir / f"shard_{si}.jsonl")
 
+        wait_started_ns = time.perf_counter_ns()
         gid = _wait_for_free_gpu(gpu_ids, busy, min_mem)
+        gpu_wait_sec += (
+            time.perf_counter_ns() - wait_started_ns
+        ) / 1_000_000_000
         cmd = [PYTHON, script,
                "--_shard-id", str(si), "--_task-file", str(tf),
                "--_gpu", gid, "--dataset", DATASET,
@@ -536,12 +826,29 @@ def launch_shards(tasks, gpu_ids, shard_dir, prm=False,
             if prm_model_id:
                 cmd += ["--_prm-model-id", prm_model_id]
         if logprob:
-            cmd.append("--_logprob")
+            cmd += [
+                "--_logprob",
+                "--logprob-batch-size",
+                str(logprob_batch_size),
+            ]
         if seed is not None:
             cmd += ["--_seed", str(seed)]
+        if timing_recorder is not None:
+            timing_file = timing_recorder.worker_timing_path(
+                phase_name, si
+            )
+            worker_timing_files.append(timing_file)
+            cmd += [
+                "--_timing-file", str(timing_file),
+                "--_timing-phase", phase_name,
+                "--_timing-run-id", timing_recorder.run_id,
+            ]
         env = os.environ.copy()
         env["CUDA_VISIBLE_DEVICES"] = gid
         env["TOKENIZERS_PARALLELISM"] = "false"
+        worker_vllm_port = _vllm_port_for_worker(si)
+        env["VLLM_PORT"] = str(worker_vllm_port)
+        worker_vllm_ports[str(si)] = worker_vllm_port
         lf = (shard_dir / f"log_{si}.txt").open("w")
         p = subprocess.Popen(
             cmd, env=env, stdout=lf, stderr=subprocess.STDOUT)
@@ -567,7 +874,31 @@ def launch_shards(tasks, gpu_ids, shard_dir, prm=False,
             for line in of.read_text().splitlines():
                 if line.strip():
                     recs.append(json.loads(line))
-    return recs
+    worker_timings = []
+    for timing_file in worker_timing_files:
+        if not timing_file.is_file():
+            raise RuntimeError(
+                f"Worker did not write timing sidecar: {timing_file}"
+            )
+        worker_timings.append(load_manifest(timing_file))
+    worker_walls = [
+        float(value["worker_wall_sec"]) for value in worker_timings
+    ]
+    stats = {
+        "phase": phase_name,
+        "tasks_executed": len(tasks),
+        "gpu_wait_sec": gpu_wait_sec,
+        "launcher_wall_sec": (
+            time.perf_counter_ns() - launch_started_ns
+        ) / 1_000_000_000,
+        "worker_wall_sec_max": max(worker_walls, default=0.0),
+        "gpu_seconds_sum": sum(worker_walls),
+        "worker_vllm_ports": worker_vllm_ports,
+        "worker_timing_files": [
+            str(path) for path in worker_timing_files
+        ],
+    }
+    return (recs, stats) if return_stats else recs
 
 
 # SECTION: signal_computation
@@ -668,6 +999,17 @@ def _vote(answers):
     return Counter(answers).most_common(1)[0][0]
 
 
+def rollback_answer_allocation(variant, ns):
+    """Return draft and suffix votes per draft for one result variant."""
+    if variant == "full":
+        return 1, ns
+    if variant == "fair":
+        return 1, max(ns - 1, 0)
+    if variant == "fair_new":
+        return 0, ns
+    raise ValueError(f"Unknown rollback result variant: {variant}")
+
+
 def evaluate_configs(
     questions, draft_map, prm_map, sfx_map,
     sc_recs, budget, active_signals,
@@ -675,43 +1017,60 @@ def evaluate_configs(
 ):
     nq = len(questions)
     results = []
+    report_f1 = DATASET in ("hotpotqa", "hotpotqa_open")
 
     # Greedy baseline: single draft (draft_idx=0), no voting
     greedy_correct = 0
+    greedy_f1 = 0.0
     greedy_toks = 0
     for q in questions:
         d = draft_map.get((q["doc_id"], 0))
-        if d and check_answer(DATASET, d.get("draft_answer", ""),
-                              q["gold_answer"]):
+        answer = d.get("draft_answer", "") if d else ""
+        if d and check_answer(DATASET, answer, q["gold_answer"]):
             greedy_correct += 1
+        if report_f1:
+            greedy_f1 += hotpotqa_f1(answer, q["gold_answer"])
         greedy_toks += d.get("draft_tokens", 0) if d else 0
-    results.append(dict(
+    greedy_result = dict(
         method="Greedy@1", nd=1, ns=0,
         acc=greedy_correct / nq,
         tokens_per_q=greedy_toks / nq,
         total_tokens=greedy_toks,
-    ))
+        n_answers=1,
+    )
+    if report_f1:
+        greedy_result["f1"] = greedy_f1 / nq
+    results.append(greedy_result)
 
     sc_by_doc = defaultdict(list)
     for s in sc_recs:
         sc_by_doc[s["doc_id"]].append(s)
-    for N in sorted(set([budget, 8, 16, 32, 40])):
+    for N in sorted({8, 16, budget}):
         correct = 0
+        f1_total = 0.0
         total_toks = 0
+        total_answers = 0
         for q in questions:
             recs = sc_by_doc.get(q["doc_id"], [])[:N]
             answers = [r["sc_answer"] for r in recs]
             toks = sum(r["sc_tokens"] for r in recs)
-            if check_answer(DATASET, _vote(answers),
-                            q["gold_answer"]):
+            voted = _vote(answers)
+            if check_answer(DATASET, voted, q["gold_answer"]):
                 correct += 1
+            if report_f1:
+                f1_total += hotpotqa_f1(voted, q["gold_answer"])
             total_toks += toks
-        results.append(dict(
+            total_answers += len(answers)
+        sc_result = dict(
             method=f"SC@{N}", nd=0, ns=N,
             acc=correct / nq,
             tokens_per_q=total_toks / nq,
             total_tokens=total_toks,
-        ))
+            n_answers=total_answers / nq,
+        )
+        if report_f1:
+            sc_result["f1"] = f1_total / nq
+        results.append(sc_result)
 
     all_strategies = set()
     for prm_rec in prm_map.values():
@@ -724,11 +1083,15 @@ def evaluate_configs(
         for nd, ns in ROLLBACK_CONFIGS:
             if nd * ns != budget:
                 continue
-            for variant in ["full", "fair"]:
+            for variant in ["full", "fair", "fair_new"]:
                 correct = 0
+                f1_total = 0.0
                 total_toks = 0
                 total_prm_toks = 0
                 total_n_answers = 0
+                total_draft_answers = 0
+                total_suffix_answers = 0
+                total_generated_drafts = 0
                 for q in questions:
                     did = q["doc_id"]
                     answers = []
@@ -738,6 +1101,11 @@ def evaluate_configs(
                         d = draft_map.get((did, di))
                         if not d:
                             continue
+                        # Every rollback candidate requires generating its
+                        # source draft, even when fair_new excludes that
+                        # draft's answer from the vote.
+                        q_toks += d["draft_tokens"]
+                        total_generated_drafts += 1
                         prm_rec = prm_map.get((did, di))
                         if prm_rec:
                             q_prm_toks += prm_rec.get(
@@ -747,17 +1115,13 @@ def evaluate_configs(
                         rb_step = rb_steps.get(strat)
 
                         if rb_step is not None:
-                            if variant == "full":
+                            draft_votes, suffix_votes = (
+                                rollback_answer_allocation(variant, ns)
+                            )
+                            if draft_votes:
                                 answers.append(d["draft_answer"])
-                                q_toks += d["draft_tokens"]
-                            else:
-                                st_key = f"{did}|{di}"
-                                st_info = (step_tokens_map or {}).get(st_key)
-                                if st_info and rb_step > 0:
-                                    cum = st_info["cumulative_tokens"]
-                                    idx = min(rb_step - 1, len(cum) - 1)
-                                    q_toks += cum[idx]
-                            for si in range(ns):
+                                total_draft_answers += 1
+                            for si in range(suffix_votes):
                                 s = sfx_map.get(
                                     (did, di, strat,
                                      rb_step, si))
@@ -766,33 +1130,52 @@ def evaluate_configs(
                                         s["suffix_answer"])
                                     q_toks += s[
                                         "suffix_tokens"]
+                                    total_suffix_answers += 1
                         else:
                             answers.append(d["draft_answer"])
-                            q_toks += d["draft_tokens"]
+                            total_draft_answers += 1
 
                     total_n_answers += len(answers)
-                    if check_answer(
-                        DATASET, _vote(answers), q["gold_answer"]
-                    ):
+                    voted = _vote(answers)
+                    if check_answer(DATASET, voted, q["gold_answer"]):
                         correct += 1
+                    if report_f1:
+                        f1_total += hotpotqa_f1(
+                            voted, q["gold_answer"]
+                        )
                     total_toks += q_toks
                     total_prm_toks += q_prm_toks
 
                 avg_n_answers = total_n_answers / nq
-                tag = (f"rollback_{strat}_nd{nd}_ns{ns}"
-                       if variant == "full"
-                       else f"rollback_{strat}_nd{nd}_ns{ns}_fair")
-                results.append(dict(
+                method_base = f"rollback_{strat}_nd{nd}_ns{ns}"
+                tag = (
+                    method_base
+                    if variant == "full"
+                    else f"{method_base}_{variant}"
+                )
+                result = dict(
                     method=tag,
                     strategy=strat,
                     variant=variant,
                     nd=nd, ns=ns,
                     n_answers=round(avg_n_answers, 1),
+                    n_draft_answers=(
+                        total_draft_answers / nq
+                    ),
+                    n_suffix_answers=(
+                        total_suffix_answers / nq
+                    ),
+                    n_generated_drafts=(
+                        total_generated_drafts / nq
+                    ),
                     acc=correct / nq,
                     tokens_per_q=total_toks / nq,
                     total_tokens=total_toks,
                     prm_tokens=total_prm_toks,
-                ))
+                )
+                if report_f1:
+                    result["f1"] = f1_total / nq
+                results.append(result)
 
     return results
 
@@ -823,6 +1206,8 @@ def make_figures(eval_results, fig_dir):
         "prm_drop": "#e74c3c",
         "prm_drop_fb_last": "#c0392b",
         "prm_drop_fb_start": "#e67e22",
+        "prm_max_drop_fb_last": "#7c3aed",
+        "prm_below_threshold_fb_last": "#db2777",
         "nll_drop": "#3498db",
         "nll_drop_fb_last": "#2980b9",
         "nll_drop_fb_start": "#8e44ad",
@@ -833,6 +1218,8 @@ def make_figures(eval_results, fig_dir):
         "prm_drop": "o",
         "prm_drop_fb_last": "s",
         "prm_drop_fb_start": "p",
+        "prm_max_drop_fb_last": "^",
+        "prm_below_threshold_fb_last": "X",
         "nll_drop": "D",
         "nll_drop_fb_last": "d",
         "nll_drop_fb_start": "h",
@@ -890,8 +1277,15 @@ def make_figures(eval_results, fig_dir):
     print(f"Figures saved to {fig_dir}")
 
 
-def save_summary_table(eval_results, out_dir, phase_times=None,
-                       n_drafts=0, nq=0):
+def save_summary_table(
+    eval_results,
+    out_dir,
+    phase_times=None,
+    n_drafts=0,
+    nq=0,
+    timing_phases=None,
+    per_question_timing=None,
+):
     out_dir.mkdir(parents=True, exist_ok=True)
     sc32 = next((r for r in eval_results
                  if r["method"] == "SC@32"), None)
@@ -911,20 +1305,90 @@ def save_summary_table(eval_results, out_dir, phase_times=None,
             "savings_vs_sc32": savings,
         })
 
+    report_f1 = any("f1" in row for row in eval_results)
     md = [
         "| method | strategy | nd | ns | acc "
-        "| tokens_per_q | savings_vs_sc32 |",
-        "|---|---|---:|---:|---:|---:|---:|",
+        + ("| F1 " if report_f1 else "")
+        + "| tokens_per_q | savings_vs_sc32 |",
+        "|---|---|---:|---:|---:|"
+        + ("---:|" if report_f1 else "")
+        + "---:|---:|",
     ]
     for r in rows:
+        source = next(
+            item for item in eval_results
+            if item["method"] == r["method"]
+        )
         md.append(
             f"| {r['method']} | {r['strategy']} "
             f"| {r['nd']} | {r['ns']} "
-            f"| {r['acc']:.4f} | {r['tokens_per_q']:.1f} "
+            f"| {r['acc']:.4f} "
+            + (f"| {source['f1']:.4f} " if report_f1 else "")
+            + f"| {r['tokens_per_q']:.1f} "
             f"| {r['savings_vs_sc32']:.1f}% |"
         )
 
-    if phase_times:
+    if per_question_timing is not None:
+        md.append("")
+        md.append(
+            "## Per-question active wall-clock "
+            "(model loading excluded)"
+        )
+        md.append("")
+        md.append(
+            "| signal | complete/questions | draft_gen_mean_sec "
+            "| suffix_gen_mean_sec | total_gen_mean_sec "
+            "| signal_mean_sec | generation/signal |"
+        )
+        md.append("|---|---:|---:|---:|---:|---:|---:|")
+        for signal_summary in per_question_timing["signals"]:
+            def _format(value):
+                return (
+                    f"{float(value):.4f}"
+                    if value is not None
+                    else "N/A"
+                )
+
+            md.append(
+                f"| {signal_summary['signal']} "
+                f"| {signal_summary['complete_questions']}/"
+                f"{signal_summary['questions']} "
+                f"| {_format(signal_summary['draft_generation_mean_sec'])} "
+                f"| {_format(signal_summary['suffix_generation_mean_sec'])} "
+                f"| {_format(signal_summary['total_generation_mean_sec'])} "
+                f"| {_format(signal_summary['signal_computation_mean_sec'])} "
+                f"| {_format(signal_summary['generation_to_signal_ratio_of_sums'])} "
+                "|"
+            )
+
+    if timing_phases is not None:
+        md.append("")
+        md.append("## Wall-clock provenance (current invocation)")
+        md.append("")
+        md.append(
+            "| phase | status | required | reused | executed "
+            "| current_sec | from_scratch_sec | reconstruction |"
+        )
+        md.append("|---|---|---:|---:|---:|---:|---:|---|")
+        for phase in timing_phases:
+            reconstructed = phase[
+                "reconstructed_from_scratch_wall_sec"
+            ]
+            reconstructed_text = (
+                f"{reconstructed:.3f}"
+                if reconstructed is not None
+                else "N/A"
+            )
+            md.append(
+                f"| {phase['phase']} | {phase['status']} "
+                f"| {phase['tasks_required']} "
+                f"| {phase['tasks_reused']} "
+                f"| {phase['tasks_executed']} "
+                f"| {phase['observed_current_wall_sec']:.3f} "
+                f"| {reconstructed_text} "
+                f"| {phase['reconstruction_kind'] or 'unavailable'} |"
+            )
+    elif phase_times:
         md.append("")
         md.append("## Signal overhead (wall-clock)")
         md.append("")
@@ -953,11 +1417,16 @@ def save_summary_table(eval_results, out_dir, phase_times=None,
 
 def main():
     global DATASET, MODEL_ID
+    main_started_ns = time.perf_counter_ns()
     args = parse_args()
     DATASET = args.dataset
     MODEL_ID = args.model
 
     if args._shard_id >= 0:
+        worker_started_ns = time.perf_counter_ns()
+        worker_tasks = json.loads(
+            Path(args._task_file).read_text(encoding="utf-8")
+        )
         if args._prm:
             run_prm_shard(args)
         elif args._skywork_prm:
@@ -966,10 +1435,20 @@ def main():
             run_logprob_shard(args)
         else:
             run_shard(args)
+        write_generic_worker_timing(
+            Path(args._timing_file) if args._timing_file else None,
+            phase=args._timing_phase or worker_tasks[0]["task_type"],
+            run_id=args._timing_run_id or "untracked",
+            shard_id=args._shard_id,
+            gpu_id=args._gpu,
+            tasks=worker_tasks,
+            started_ns=worker_started_ns,
+        )
         return
 
     signals = args.signals
     prm_thr = args.prm_drop_threshold
+    prm_absolute_thr = args.prm_absolute_threshold
     nll_thr = args.nll_drop_threshold
     use_skywork = "skywork" in args.prm_model.lower()
 
@@ -1009,7 +1488,8 @@ def main():
         / f"{model_short}_budget_multisignal{prm_tag}{suffix}"
         / DATASET)
     out_dir.mkdir(parents=True, exist_ok=True)
-    fig_dir = (PROJECT_ROOT / "figures"
+    fig_dir = (Path(args.fig_dir) if args.fig_dir else
+               PROJECT_ROOT / "figures"
                / f"budget_multisignal{suffix}")
     ckpt = out_dir / "checkpoint.jsonl"
     sd = out_dir / "_shards"
@@ -1022,15 +1502,128 @@ def main():
           f"GPUs: {gpu_ids}")
     print(f"Budget B={B}, signals={signals}")
     print(f"Sampling seed: {args.seed}")
+    print(f"NLL logprob batch size: {args.logprob_batch_size}")
     print(f"PRM model: {args.prm_model}"
           f"{' (Skywork 1.5B)' if use_skywork else ''}")
+    print(f"Absolute PRM threshold: {prm_absolute_thr}")
 
-    existing = []
+    checkpoint_parts = [Path(value) for value in args.checkpoint_part]
+    local_existing = []
     if ckpt.exists():
-        existing = [json.loads(l)
-                    for l in ckpt.read_text().splitlines()
-                    if l.strip()]
-    print(f"Existing checkpoint: {len(existing)} records")
+        local_existing = read_checkpoint_records(ckpt)
+    existing = []
+    seen_checkpoint_records = {}
+    for path in [*checkpoint_parts, ckpt]:
+        records = (
+            local_existing
+            if path == ckpt
+            else read_checkpoint_records(path)
+        )
+        for record in records:
+            identity = checkpoint_record_identity(record)
+            previous = seen_checkpoint_records.get(identity)
+            if previous is not None:
+                raise ValueError(
+                    f"Duplicate checkpoint identity {identity}: "
+                    f"{previous} and {path}"
+                )
+            seen_checkpoint_records[identity] = path
+            existing.append(record)
+        if path != ckpt:
+            print(f"Checkpoint part {path}: {len(records)} records")
+    print(
+        f"Existing checkpoint union: {len(existing)} records "
+        f"({len(local_existing)} local)"
+    )
+    if args.timing_mode == "fresh" and (
+        local_existing or checkpoint_parts
+    ):
+        raise ValueError(
+            "--timing-mode fresh does not permit existing local records "
+            "or --checkpoint-part"
+        )
+    if args.timing_mode == "fresh" and args.draft_checkpoint:
+        raise ValueError(
+            "--timing-mode fresh cannot import --draft-checkpoint"
+        )
+
+    timing_source_candidates = [
+        Path(value) for value in args.reuse_timing_manifest
+    ]
+    for path in checkpoint_parts:
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"Checkpoint part does not exist: {path}"
+            )
+        discovered = discover_timing_manifest(path)
+        if discovered is not None:
+            timing_source_candidates.append(discovered)
+    current_timing = out_dir / "timing" / "timing_manifest.json"
+    if current_timing.is_file():
+        timing_source_candidates.append(current_timing)
+    if args.draft_checkpoint:
+        discovered = discover_timing_manifest(
+            Path(args.draft_checkpoint)
+        )
+        if discovered is not None:
+            timing_source_candidates.append(discovered)
+    timing_sources = []
+    seen_timing_sources = set()
+    for path in timing_source_candidates:
+        resolved = path.resolve()
+        if resolved in seen_timing_sources:
+            continue
+        if not resolved.is_file():
+            raise FileNotFoundError(
+                f"Reused timing manifest does not exist: {resolved}"
+            )
+        seen_timing_sources.add(resolved)
+        timing_sources.append(resolved)
+    task_event_source_candidates = []
+    for checkpoint_path in checkpoint_parts:
+        discovered = discover_task_event_store(checkpoint_path)
+        if discovered is not None:
+            task_event_source_candidates.append(discovered.resolve())
+    if args.draft_checkpoint:
+        discovered = discover_task_event_store(
+            Path(args.draft_checkpoint)
+        )
+        if discovered is not None:
+            task_event_source_candidates.append(discovered.resolve())
+    for manifest_path in timing_sources:
+        discovered = task_event_store_for_manifest(manifest_path)
+        if discovered is not None:
+            task_event_source_candidates.append(discovered.resolve())
+    task_event_sources = []
+    seen_event_sources = set()
+    for path in task_event_source_candidates:
+        if path in seen_event_sources:
+            continue
+        seen_event_sources.add(path)
+        task_event_sources.append(path)
+    timing = RunTimingRecorder(
+        out_dir,
+        mode=args.timing_mode,
+        context={
+            "dataset": DATASET,
+            "model": MODEL_ID,
+            "prm_model": args.prm_model,
+            "seed": args.seed,
+            "budget": B,
+            "signals": signals,
+            "nd": [nd for nd, _ in ROLLBACK_CONFIGS],
+            "logprob_batch_size": args.logprob_batch_size,
+            "checkpoint": str(ckpt.resolve()),
+            "checkpoint_parts": [
+                str(path.resolve()) for path in checkpoint_parts
+            ],
+            "task_event_sources": [
+                str(path) for path in task_event_sources
+            ],
+        },
+        source_manifests=timing_sources,
+        started_ns=main_started_ns,
+    )
 
     # Import drafts from external checkpoint if specified
     if args.draft_checkpoint:
@@ -1060,19 +1653,25 @@ def main():
             print(f"WARNING: --draft-checkpoint not found: "
                   f"{ext_path}")
 
-    # Timing bookkeeping — cumulative across runs
+    # Legacy cumulative timings are retained for old consumers.  New code
+    # should use timing/timing_manifest.json, which is invocation-scoped and
+    # checkpoint-aware.
     timing_path = out_dir / "phase_times.json"
     if timing_path.exists():
         phase_times = json.loads(timing_path.read_text())
     else:
         phase_times = {}
 
-    def _record_time(phase_name, elapsed):
+    def _record_time(phase_name, elapsed, executed_count):
+        if executed_count <= 0:
+            return
         phase_times[phase_name] = phase_times.get(phase_name, 0.0) + elapsed
         timing_path.write_text(json.dumps(phase_times, indent=2))
 
     # ---- Phase 1: Sample drafts ----
-    _t0 = time.time()
+    _t0 = time.perf_counter_ns()
+    draft_new = []
+    draft_launch = {}
     if 1 not in args.skip_phase:
         done = {(r["doc_id"], r["draft_idx"])
                 for r in existing
@@ -1094,25 +1693,43 @@ def main():
                 ))
         if tasks:
             print(f"\n--- Phase 1: {len(tasks)} drafts ---")
-            new = launch_shards(tasks, gpu_ids, sd / "p1",
-                                seed=args.seed)
+            draft_new, draft_launch = launch_shards(
+                tasks,
+                gpu_ids,
+                sd / "p1",
+                seed=args.seed,
+                phase_name="draft",
+                timing_recorder=timing,
+                return_stats=True,
+            )
             with ckpt.open("a") as f:
-                for r in new:
+                for r in draft_new:
                     f.write(json.dumps(r, ensure_ascii=False)
                             + "\n")
-            existing.extend(new)
-
-    _record_time("draft", time.time() - _t0)
+            existing.extend(draft_new)
 
     drafts = [r for r in existing
               if r.get("task_type") == "draft"]
+    draft_elapsed = (
+        time.perf_counter_ns() - _t0
+    ) / 1_000_000_000
+    _record_time("draft", draft_elapsed, len(draft_new))
+    timing.record_phase(
+        "draft",
+        required=drafts,
+        executed=draft_new,
+        current_wall_sec=draft_elapsed,
+        launch_stats=draft_launch,
+    )
     draft_map = {(r["doc_id"], r["draft_idx"]): r
                  for r in drafts}
     print(f"Total drafts: {len(drafts)}")
 
     # ---- Phase 2: PRM scoring (if prm_drop in signals) ----
-    _t0 = time.time()
-    need_prm = any(s.startswith("prm_drop") for s in signals)
+    _t0 = time.perf_counter_ns()
+    prm_new = []
+    prm_launch = {}
+    need_prm = any(s.startswith("prm_") for s in signals)
     if need_prm and 2 not in args.skip_phase:
         done = {(r["doc_id"], r.get("draft_idx", 0))
                 for r in existing
@@ -1159,30 +1776,52 @@ def main():
             print(f"\n--- Phase 2: {len(prm_tasks)} PRM "
                   f"({args.prm_model}) ---")
             if use_skywork:
-                new = launch_shards(
+                prm_new, prm_launch = launch_shards(
                     prm_tasks, gpu_ids, sd / "p2",
                     skywork_prm=True,
-                    prm_model_id=args.prm_model)
+                    prm_model_id=args.prm_model,
+                    phase_name="prm",
+                    timing_recorder=timing,
+                    return_stats=True,
+                )
             else:
-                new = launch_shards(
-                    prm_tasks, gpu_ids, sd / "p2", prm=True)
+                prm_new, prm_launch = launch_shards(
+                    prm_tasks,
+                    gpu_ids,
+                    sd / "p2",
+                    prm=True,
+                    phase_name="prm",
+                    timing_recorder=timing,
+                    return_stats=True,
+                )
             with ckpt.open("a") as f:
-                for r in new:
+                for r in prm_new:
                     f.write(json.dumps(r, ensure_ascii=False)
                             + "\n")
-            existing.extend(new)
-
-    _record_time("prm", time.time() - _t0)
+            existing.extend(prm_new)
 
     prm_recs = [r for r in existing
                 if r.get("task_type") == "prm"]
+    prm_elapsed = (
+        time.perf_counter_ns() - _t0
+    ) / 1_000_000_000
+    _record_time("prm", prm_elapsed, len(prm_new))
+    timing.record_phase(
+        "prm",
+        required=prm_recs if need_prm else [],
+        executed=prm_new,
+        current_wall_sec=prm_elapsed,
+        launch_stats=prm_launch,
+    )
     prm_map = {}
     for r in prm_recs:
         prm_map[(r["doc_id"], r.get("draft_idx", 0))] = r
     print(f"Total PRM records: {len(prm_recs)}")
 
     # ---- Phase 3: Logprob collection (if nll_drop) ----
-    _t0 = time.time()
+    _t0 = time.perf_counter_ns()
+    lp_new = []
+    lp_launch = {}
     need_lp = any(s.startswith("nll_drop") for s in signals)
     if need_lp and 3 not in args.skip_phase:
         done = {(r["doc_id"], r.get("draft_idx", 0))
@@ -1211,25 +1850,40 @@ def main():
         if lp_tasks:
             print(f"\n--- Phase 3: {len(lp_tasks)} "
                   f"logprob ---")
-            new = launch_shards(
+            lp_new, lp_launch = launch_shards(
                 lp_tasks, gpu_ids, sd / "p3",
-                logprob=True)
+                logprob=True,
+                logprob_batch_size=args.logprob_batch_size,
+                phase_name="nll",
+                timing_recorder=timing,
+                return_stats=True,
+            )
             with ckpt.open("a") as f:
-                for r in new:
+                for r in lp_new:
                     f.write(json.dumps(r, ensure_ascii=False)
                             + "\n")
-            existing.extend(new)
-
-    _record_time("nll", time.time() - _t0)
+            existing.extend(lp_new)
 
     lp_recs = [r for r in existing
                if r.get("task_type") == "logprob"]
+    lp_elapsed = (
+        time.perf_counter_ns() - _t0
+    ) / 1_000_000_000
+    _record_time("nll", lp_elapsed, len(lp_new))
+    timing.record_phase(
+        "nll",
+        required=lp_recs if need_lp else [],
+        executed=lp_new,
+        current_wall_sec=lp_elapsed,
+        launch_stats=lp_launch,
+    )
     lp_map = {(r["doc_id"], r.get("draft_idx", 0)): r
               for r in lp_recs}
     print(f"Total logprob records: {len(lp_recs)}")
 
     # ---- Phase 2.5: GPT first-error detection (live API) ----
-    _t0 = time.time()
+    _t0 = time.perf_counter_ns()
+    gpt_new = []
     need_gpt = any(s.startswith("gpt") for s in signals)
     gpt_cache_path = out_dir / "gpt_first_error_cache.jsonl"
     gpt_tau_map: Dict[Tuple, int] = {}
@@ -1297,6 +1951,7 @@ def main():
             if args.gpt_max_workers <= 1:
                 for t in _tqdm(gpt_tasks, desc="GPT first-error"):
                     rec = _gpt_process(t)
+                    gpt_new.append(rec)
                     key = f"{rec['doc_id']}|{rec['draft_idx']}"
                     warm_cache[key] = rec
                     with gpt_cache_path.open("a", encoding="utf-8") as f:
@@ -1310,6 +1965,7 @@ def main():
                                      total=len(futs),
                                      desc="GPT first-error"):
                         rec = fut.result()
+                        gpt_new.append(rec)
                         key = f"{rec['doc_id']}|{rec['draft_idx']}"
                         warm_cache[key] = rec
                         with gpt_cache_path.open("a", encoding="utf-8") as f:
@@ -1322,7 +1978,32 @@ def main():
             doc_id, di = parts[0], int(parts[1])
             gpt_tau_map[(doc_id, di)] = rec.get("tau")
 
-    _record_time("gpt", time.time() - _t0)
+    gpt_required = [
+        {
+            "task_type": "gpt",
+            "doc_id": draft["doc_id"],
+            "draft_idx": draft["draft_idx"],
+        }
+        for draft in drafts
+    ] if need_gpt else []
+    gpt_executed = [
+        {
+            "task_type": "gpt",
+            "doc_id": record["doc_id"],
+            "draft_idx": record["draft_idx"],
+        }
+        for record in gpt_new
+    ]
+    gpt_elapsed = (
+        time.perf_counter_ns() - _t0
+    ) / 1_000_000_000
+    _record_time("gpt", gpt_elapsed, len(gpt_new))
+    timing.record_phase(
+        "gpt",
+        required=gpt_required,
+        executed=gpt_executed,
+        current_wall_sec=gpt_elapsed,
+    )
 
     # ---- Compute rollback points per signal ----
     for q in questions:
@@ -1344,6 +2025,23 @@ def main():
                 rb_steps.update(
                     compute_rollback_step_prm_drop(
                         scores, n, prm_thr))
+
+            scores = prm_rec.get("step_scores", [])
+            if MAX_PRM_DROP_SIGNAL in signals:
+                assignment = max_prm_drop_assignment(scores, n)
+                rb_steps[MAX_PRM_DROP_SIGNAL] = int(
+                    assignment["rollback_step"]
+                )
+
+            if PRM_BELOW_THRESHOLD_SIGNAL in signals:
+                assignment = prm_below_threshold_assignment(
+                    scores,
+                    n,
+                    prm_absolute_thr,
+                )
+                rb_steps[PRM_BELOW_THRESHOLD_SIGNAL] = int(
+                    assignment["rollback_step"]
+                )
 
             if any(s.startswith("nll_drop") for s in signals):
                 lp_rec = lp_map.get((q["doc_id"], di))
@@ -1369,7 +2067,9 @@ def main():
             prm_rec["_rb_steps"] = rb_steps
 
     # ---- Phase 4: Suffix generation ----
-    _t0 = time.time()
+    _t0 = time.perf_counter_ns()
+    suffix_new = []
+    suffix_launch = {}
     if 4 not in args.skip_phase:
         done_sfx = set()
         for r in existing:
@@ -1423,19 +2123,32 @@ def main():
         if sfx_tasks:
             print(f"\n--- Phase 4: {len(sfx_tasks)} "
                   f"suffix generations ---")
-            new = launch_shards(
+            suffix_new, suffix_launch = launch_shards(
                 sfx_tasks, gpu_ids, sd / "p4",
-                seed=args.seed)
+                seed=args.seed,
+                phase_name="suffix",
+                timing_recorder=timing,
+                return_stats=True,
+            )
             with ckpt.open("a") as f:
-                for r in new:
+                for r in suffix_new:
                     f.write(json.dumps(r, ensure_ascii=False)
                             + "\n")
-            existing.extend(new)
-
-    _record_time("suffix", time.time() - _t0)
+            existing.extend(suffix_new)
 
     sfx_recs = [r for r in existing
                 if r.get("task_type") == "suffix"]
+    suffix_elapsed = (
+        time.perf_counter_ns() - _t0
+    ) / 1_000_000_000
+    _record_time("suffix", suffix_elapsed, len(suffix_new))
+    timing.record_phase(
+        "suffix",
+        required=sfx_recs,
+        executed=suffix_new,
+        current_wall_sec=suffix_elapsed,
+        launch_stats=suffix_launch,
+    )
     sfx_map = {}
     for s in sfx_recs:
         sfx_map[(s["doc_id"], s["draft_idx"],
@@ -1446,6 +2159,9 @@ def main():
     # ---- Phase 5: Full SC baseline ----
     # Drafts are i.i.d. samples from the same distribution, so we
     # reuse them as part of the SC pool and only supplement the rest.
+    _t0 = time.perf_counter_ns()
+    sc_new = []
+    sc_launch = {}
     sc_supplement = max(0, sc_n - nd_max)
     if 5 not in args.skip_phase:
         done_sc = {(r["doc_id"], r["sc_idx"])
@@ -1469,17 +2185,32 @@ def main():
         if sc_tasks:
             print(f"\n--- Phase 5: {len(sc_tasks)} SC "
                   f"(supplement; {nd_max} drafts reused) ---")
-            new = launch_shards(
+            sc_new, sc_launch = launch_shards(
                 sc_tasks, gpu_ids, sd / "p5",
-                seed=args.seed)
+                seed=args.seed,
+                phase_name="fullsc",
+                timing_recorder=timing,
+                return_stats=True,
+            )
             with ckpt.open("a") as f:
-                for r in new:
+                for r in sc_new:
                     f.write(json.dumps(r, ensure_ascii=False)
                             + "\n")
-            existing.extend(new)
+            existing.extend(sc_new)
 
     sc_recs = [r for r in existing
                if r.get("task_type") == "fullsc"]
+    sc_elapsed = (
+        time.perf_counter_ns() - _t0
+    ) / 1_000_000_000
+    _record_time("fullsc", sc_elapsed, len(sc_new))
+    timing.record_phase(
+        "fullsc",
+        required=sc_recs,
+        executed=sc_new,
+        current_wall_sec=sc_elapsed,
+        launch_stats=sc_launch,
+    )
     # Merge drafts into SC pool (drafts are i.i.d. with fullsc)
     draft_as_sc = []
     for d in drafts:
@@ -1492,29 +2223,83 @@ def main():
     print(f"Total SC pool: {len(draft_as_sc)} drafts + "
           f"{len(sc_recs)} fullsc = {len(sc_pool)}")
 
+    per_question_timing = publish_per_question_timings(
+        out_dir,
+        checkpoint_records=existing,
+        signals=signals,
+        current_run_dir=timing.run_dir,
+        source_event_stores=task_event_sources,
+    )
+    print(
+        "Per-question timing: "
+        f"{per_question_timing['task_events_recorded']}/"
+        f"{per_question_timing['task_events_required']} task events"
+    )
+    for signal_summary in per_question_timing["signals"]:
+        print(
+            f"  {signal_summary['signal']}: "
+            f"{signal_summary['complete_questions']}/"
+            f"{signal_summary['questions']} complete questions, "
+            "generation_mean="
+            f"{signal_summary['total_generation_mean_sec']}, "
+            "signal_mean="
+            f"{signal_summary['signal_computation_mean_sec']}"
+        )
+
+    if args.skip_eval:
+        stale_artifacts = [
+            out_dir / "eval_summary.json",
+            out_dir / "eval_summary_table.md",
+            fig_dir / "fig_efficiency_frontier.json",
+            fig_dir / "fig_efficiency_frontier.pdf",
+            fig_dir / "fig_efficiency_frontier.png",
+        ]
+        removed = []
+        for artifact in stale_artifacts:
+            if artifact.is_file():
+                artifact.unlink()
+                removed.append(str(artifact))
+        print("Evaluation skipped (checkpoint preparation only).")
+        if removed:
+            print("Removed stale evaluation artifacts:")
+            for artifact in removed:
+                print(f"  {artifact}")
+        timing_manifest = timing.finalize()
+        print(
+            "Timing manifest: "
+            f"{out_dir / 'timing' / 'timing_manifest.json'} "
+            f"(current={timing_manifest['observed_current_end_to_end_wall_sec']:.3f}s, "
+            "from_scratch="
+            f"{timing_manifest['reconstructed_from_scratch_wall_sec']})"
+        )
+        return
+
     # ---- Evaluate ----
+    evaluation_started_ns = time.perf_counter_ns()
     print("\n--- Evaluation ---")
 
-    # Signal overhead timing summary
+    # Invocation-scoped wall-clock summary.  Historical time is printed only
+    # when an exact task-set timing source was available.
     n_drafts = len(drafts)
     nq = len(questions)
-    print(f"\n--- Signal overhead (wall-clock) ---")
-    for phase_name, label in [
-        ("prm", "PRM scoring"),
-        ("nll", "NLL/logprob"),
-        ("gpt", "GPT first-error"),
-    ]:
-        t = phase_times.get(phase_name, 0.0)
-        per_sample = t / n_drafts * 1000 if n_drafts else 0
-        per_q = t / nq * 1000 if nq else 0
-        print(f"  {label:<20s}: {t:8.1f}s total | "
-              f"{per_sample:.1f}ms/sample | {per_q:.1f}ms/question")
-    for phase_name, label in [
-        ("draft", "Draft generation"),
-        ("suffix", "Suffix generation"),
-    ]:
-        t = phase_times.get(phase_name, 0.0)
-        print(f"  {label:<20s}: {t:8.1f}s total")
+    print("\n--- Wall-clock provenance (current invocation) ---")
+    for phase in timing.phases:
+        reconstructed = phase[
+            "reconstructed_from_scratch_wall_sec"
+        ]
+        reconstructed_text = (
+            f"{reconstructed:.3f}s"
+            if reconstructed is not None
+            else "N/A"
+        )
+        print(
+            f"  {phase['phase']:<10s} "
+            f"status={phase['status']:<12s} "
+            f"tasks={phase['tasks_executed']}/"
+            f"{phase['tasks_required']} "
+            f"current={phase['observed_current_wall_sec']:.3f}s "
+            f"from_scratch={reconstructed_text}"
+        )
 
     # Re-extract answers from raw text to pick up any
     # extract_answer improvements without re-generating.
@@ -1562,8 +2347,36 @@ def main():
     print(f"\nSaved: {summary_path}")
 
     make_figures(eval_results, fig_dir)
-    save_summary_table(eval_results, out_dir, phase_times,
-                       n_drafts, nq)
+    evaluation_elapsed = (
+        time.perf_counter_ns() - evaluation_started_ns
+    ) / 1_000_000_000
+    evaluation_task = [{
+        "task_type": "evaluation",
+        "doc_id": DATASET,
+    }]
+    timing.record_phase(
+        "evaluation",
+        required=evaluation_task,
+        executed=evaluation_task,
+        current_wall_sec=evaluation_elapsed,
+    )
+    save_summary_table(
+        eval_results,
+        out_dir,
+        phase_times,
+        n_drafts,
+        nq,
+        timing_phases=timing.phases,
+        per_question_timing=per_question_timing,
+    )
+    timing_manifest = timing.finalize()
+    print(
+        "Timing manifest: "
+        f"{out_dir / 'timing' / 'timing_manifest.json'} "
+        f"(current={timing_manifest['observed_current_end_to_end_wall_sec']:.3f}s, "
+        "from_scratch="
+        f"{timing_manifest['reconstructed_from_scratch_wall_sec']})"
+    )
     print("Done.")
 
 

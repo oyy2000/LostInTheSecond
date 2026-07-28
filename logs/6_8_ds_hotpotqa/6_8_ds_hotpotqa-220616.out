@@ -1,0 +1,267 @@
+Running on c31
+/mnt/beegfs/youyang7/.conda/envs/fact/bin/python
+Python 3.10.18
+Wed May  6 15:03:02 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX A6000               On  |   00000000:01:00.0 Off |                  Off |
+| 30%   44C    P2            109W /  200W |    6710MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX A6000               On  |   00000000:41:00.0 Off |                  Off |
+| 30%   52C    P0             91W /  200W |       4MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX A6000               On  |   00000000:81:00.0 Off |                  Off |
+| 30%   50C    P5             24W /  200W |       4MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   3  NVIDIA RTX A6000               On  |   00000000:C1:00.0 Off |                  Off |
+| 30%   49C    P5             44W /  200W |       4MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A         1290513      C   python                                 6700MiB |
++-----------------------------------------------------------------------------------------+
+All 4 GPUs have at least 40000 MiB free.
+Wed May  6 15:03:03 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX A6000               On  |   00000000:01:00.0 Off |                  Off |
+| 30%   44C    P2            108W /  200W |    6710MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX A6000               On  |   00000000:41:00.0 Off |                  Off |
+| 30%   51C    P0             91W /  200W |       4MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX A6000               On  |   00000000:81:00.0 Off |                  Off |
+| 30%   50C    P3             24W /  200W |       4MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   3  NVIDIA RTX A6000               On  |   00000000:C1:00.0 Off |                  Off |
+| 30%   49C    P5             44W /  200W |       4MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A         1290513      C   python                                 6700MiB |
++-----------------------------------------------------------------------------------------+
+Sweep: 1 models x 7 datasets = 7 runs
+Models:   ['deepseek7b']
+Datasets: ['gsm8k', 'hotpotqa_open', '2wikimultihopqa_open', 'math500', 'amc2023', 'aime2024', 'olympiadbench']
+Signals:  ['prm_drop_fb_last', 'nll_drop_fb_last']
+GPUs:     1,2,3
+N-sample: 100
+
+>>> Run 1/7: deepseek7b x gsm8k
+
+======================================================================
+  Model: deepseek7b (deepseek-ai/DeepSeek-R1-Distill-Qwen-7B)
+  Dataset: gsm8k
+  Out: /mnt/beegfs/youyang7/projects/LostInSecond/results/deepseek_r1_distill_qwen_7b_budget_multisignal/gsm8k
+  Cmd: /mnt/beegfs/youyang7/.conda/envs/fact/bin/python /home/youyang7/projects/LostInTheSecond/scripts/6_8_budget_controlled_multisignal.py --gpus 1,2,3 --model deepseek-ai/DeepSeek-R1-Distill-Qwen-7B --dataset gsm8k --budget 32 --n-sample 100 --signals prm_drop_fb_last nll_drop_fb_last --gpt-model gpt-5.1 --gpt-max-workers 32 --out-dir /mnt/beegfs/youyang7/projects/LostInSecond/results/deepseek_r1_distill_qwen_7b_budget_multisignal/gsm8k --skip-phase 25 --nd 4 8 16
+======================================================================
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: gsm8k, 100 questions, GPUs: ['1', '2', '3']
+Budget B=32, signals=['prm_drop_fb_last', 'nll_drop_fb_last']
+Sampling seed: None
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint: 0 records
+
+--- Phase 1: 1600 drafts ---
+  Shard 0 on GPU 1: 534 tasks
+  Shard 1 on GPU 2: 533 tasks
+  Shard 2 on GPU 3: 533 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 22/22 [00:55<00:00,  2.50s/it, est. speed input: 56.72 toks/s, output: 367.13 toks/s]
+[Shard 0] draft batch 2/2
+[Shard 0] Done: 534
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 21/21 [00:55<00:00,  2.65s/it, est. speed input: 54.45 toks/s, output: 377.05 toks/s]
+[Shard 1] draft batch 2/2
+[Shard 1] Done: 533
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 21/21 [00:55<00:00,  2.63s/it, est. speed input: 54.30 toks/s, output: 374.65 toks/s]
+[Shard 2] draft batch 2/2
+[Shard 2] Done: 533
+Total drafts: 1600
+
+--- Phase 2: 1600 PRM (Qwen/Qwen2.5-Math-PRM-7B) ---
+  Shard 0 on GPU 1: 534 tasks
+  Shard 1 on GPU 2: 533 tasks
+  Shard 2 on GPU 3: 533 tasks
+  Shard 0 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 0] Done: 534
+  Shard 1 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 1] Done: 533
+  Shard 2 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 2] Done: 533
+Total PRM records: 1600
+
+--- Phase 3: 1600 logprob ---
+  Shard 0 on GPU 1: 534 tasks
+  Shard 1 on GPU 2: 533 tasks
+  Shard 2 on GPU 3: 533 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 6/6 [00:00<00:00,  6.07it/s, est. speed input: 4368.68 toks/s, output: 6.07 toks/s]
+[LP Shard 0] batch 67/67
+[LP Shard 0] Done: 534
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 5/5 [00:00<00:00,  6.73it/s, est. speed input: 4370.80 toks/s, output: 6.73 toks/s]
+[LP Shard 1] batch 67/67
+[LP Shard 1] Done: 533
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 5/5 [00:01<00:00,  4.44it/s, est. speed input: 4427.95 toks/s, output: 4.44 toks/s]
+[LP Shard 2] batch 67/67
+[LP Shard 2] Done: 533
+Total logprob records: 1600
+
+--- Phase 4: 12800 suffix generations ---
+  Shard 0 on GPU 1: 4267 tasks
+  Shard 1 on GPU 2: 4267 tasks
+  Shard 2 on GPU 3: 4266 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 171/171 [01:37<00:00,  1.75it/s, est. speed input: 1343.63 toks/s, output: 773.63 toks/s]
+[Shard 0] suffix batch 9/9
+[Shard 0] Done: 4267
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 171/171 [01:37<00:00,  1.75it/s, est. speed input: 1369.97 toks/s, output: 752.92 toks/s]
+[Shard 1] suffix batch 9/9
+[Shard 1] Done: 4267
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 170/170 [01:38<00:00,  1.73it/s, est. speed input: 1394.52 toks/s, output: 750.53 toks/s]
+[Shard 2] suffix batch 9/9
+[Shard 2] Done: 4266
+Total suffix records: 12800
+
+--- Phase 5: 1600 SC (supplement; 16 drafts reused) ---
+  Shard 0 on GPU 1: 534 tasks
+  Shard 1 on GPU 2: 533 tasks
+  Shard 2 on GPU 3: 533 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 22/22 [00:54<00:00,  2.50s/it, est. speed input: 56.77 toks/s, output: 367.42 toks/s]
+[Shard 0] fullsc batch 2/2
+[Shard 0] Done: 534
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 21/21 [00:55<00:00,  2.65s/it, est. speed input: 54.49 toks/s, output: 377.30 toks/s]
+[Shard 1] fullsc batch 2/2
+[Shard 1] Done: 533
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 21/21 [00:55<00:00,  2.63s/it, est. speed input: 54.32 toks/s, output: 374.77 toks/s]
+[Shard 2] fullsc batch 2/2
+[Shard 2] Done: 533
+Total SC pool: 1600 drafts + 1600 fullsc = 3200
+
+--- Evaluation ---
+
+--- Signal overhead (wall-clock) ---
+  PRM scoring         :    121.1s total | 75.7ms/sample | 1210.9ms/question
+  NLL/logprob         :    157.4s total | 98.4ms/sample | 1574.4ms/question
+  GPT first-error     :      0.0s total | 0.0ms/sample | 0.0ms/question
+  Draft generation    :    325.3s total
+  Suffix generation   :   1421.4s total
+  Re-extracted answers for 16000 records
+  WARNING: draft_step_tokens.json not found, using full draft_tokens for fair prefix cost
+
+Method                                   Acc      Tok/Q     TotalTok
+--------------------------------------------------------------------
+Greedy@1                              0.9500        772       77,192
+SC@8                                  0.9600       6215      621,482
+SC@16                                 0.9600      12544    1,254,394
+SC@32                                 0.9600      25088    2,508,788
+SC@40                                 0.9600      25088    2,508,788
+rollback_nll_drop_fb_last_nd4_ns8     0.9600      12726    1,272,630
+rollback_nll_drop_fb_last_nd4_ns8_fair   0.9600       9618      961,761
+rollback_nll_drop_fb_last_nd8_ns4     0.9600      15693    1,569,253
+rollback_nll_drop_fb_last_nd8_ns4_fair   0.9600       9558      955,835
+rollback_nll_drop_fb_last_nd16_ns2    0.9600      21989    2,198,876
+rollback_nll_drop_fb_last_nd16_ns2_fair   0.9600       9445      944,482
+rollback_prm_drop_fb_last_nd4_ns8     0.9600      11903    1,190,308
+rollback_prm_drop_fb_last_nd4_ns8_fair   0.9600       8794      879,439
+rollback_prm_drop_fb_last_nd8_ns4     0.9600      15100    1,510,021
+rollback_prm_drop_fb_last_nd8_ns4_fair   0.9600       8966      896,603
+rollback_prm_drop_fb_last_nd16_ns2    0.9600      21666    2,166,635
+rollback_prm_drop_fb_last_nd16_ns2_fair   0.9600       9122      912,241
+
+Saved: /mnt/beegfs/youyang7/projects/LostInSecond/results/deepseek_r1_distill_qwen_7b_budget_multisignal/gsm8k/eval_summary.json
+Figures saved to /home/youyang7/projects/LostInTheSecond/figures/budget_multisignal
+Saved table: /mnt/beegfs/youyang7/projects/LostInSecond/results/deepseek_r1_distill_qwen_7b_budget_multisignal/gsm8k/eval_summary_table.md
+Done.
+
+  [OK] deepseek7b x gsm8k in 2362s (39.4min)
+
+>>> Run 2/7: deepseek7b x hotpotqa_open
+
+======================================================================
+  Model: deepseek7b (deepseek-ai/DeepSeek-R1-Distill-Qwen-7B)
+  Dataset: hotpotqa_open
+  Out: /mnt/beegfs/youyang7/projects/LostInSecond/results/deepseek_r1_distill_qwen_7b_budget_multisignal/hotpotqa_open
+  Cmd: /mnt/beegfs/youyang7/.conda/envs/fact/bin/python /home/youyang7/projects/LostInTheSecond/scripts/6_8_budget_controlled_multisignal.py --gpus 1,2,3 --model deepseek-ai/DeepSeek-R1-Distill-Qwen-7B --dataset hotpotqa_open --budget 32 --n-sample 100 --signals prm_drop_fb_last nll_drop_fb_last --gpt-model gpt-5.1 --gpt-max-workers 32 --out-dir /mnt/beegfs/youyang7/projects/LostInSecond/results/deepseek_r1_distill_qwen_7b_budget_multisignal/hotpotqa_open --skip-phase 25 --nd 4 8 16
+======================================================================
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: hotpotqa_open, 100 questions, GPUs: ['1', '2', '3']
+Budget B=32, signals=['prm_drop_fb_last', 'nll_drop_fb_last']
+Sampling seed: None
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint: 0 records
+
+--- Phase 1: 1600 drafts ---
+  Shard 0 on GPU 1: 534 tasks
+  Shard 1 on GPU 2: 533 tasks
+  Shard 2 on GPU 3: 533 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 22/22 [01:02<00:00,  2.85s/it, est. speed input: 505.07 toks/s, output: 291.07 toks/s]
+[Shard 0] draft batch 2/2
+[Shard 0] Done: 534
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 21/21 [01:02<00:00,  2.96s/it, est. speed input: 486.57 toks/s, output: 260.72 toks/s]
+[Shard 1] draft batch 2/2
+[Shard 1] Done: 533
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 21/21 [01:02<00:00,  2.99s/it, est. speed input: 490.07 toks/s, output: 304.03 toks/s]
+[Shard 2] draft batch 2/2
+[Shard 2] Done: 533
+Total drafts: 1600
+
+--- Phase 2: 1600 PRM (Qwen/Qwen2.5-Math-PRM-7B) ---
+  Shard 0 on GPU 1: 534 tasks
+  Shard 1 on GPU 2: 533 tasks
+  Shard 2 on GPU 3: 533 tasks
+  Shard 0 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 0] Done: 534
+  Shard 1 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 1] Done: 533
+  Shard 2 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 2] Done: 533
+Total PRM records: 1600
+
+--- Phase 3: 1600 logprob ---
+  Shard 0 on GPU 1: 534 tasks
+  Shard 1 on GPU 2: 533 tasks
+  Shard 2 on GPU 3: 533 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 6/6 [00:01<00:00,  3.64it/s, est. speed input: 7528.23 toks/s, output: 2.43 toks/s]
+[LP Shard 0] batch 67/67
+[LP Shard 0] Done: 534
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 5/5 [00:01<00:00,  4.08it/s, est. speed input: 8239.07 toks/s, output: 2.45 toks/s]
+[LP Shard 1] batch 67/67
+[LP Shard 1] Done: 533
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 5/5 [00:01<00:00,  2.96it/s, est. speed input: 5627.31 toks/s, output: 2.37 toks/s]
+[LP Shard 2] batch 67/67
+[LP Shard 2] Done: 533
+Total logprob records: 1600
+
+--- Phase 4: 12800 suffix generations ---
+  Shard 0 on GPU 1: 4267 tasks
+  Shard 1 on GPU 2: 4267 tasks
+  Shard 2 on GPU 3: 4266 tasks

@@ -1,0 +1,93 @@
+host=c0
+array_job=266096
+array_task=3
+run_seed=789
+mode=generation-only
+python=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python
+Python 3.10.18
+Sat Jul 25 00:18:05 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 4060 Ti     Off |   00000000:21:00.0 Off |                  N/A |
+|  0%   35C    P8             12W /  165W |       2MiB /  16380MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+seed=789
+output=/home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_math500_five_seed_corrected/seed_789/math500
+command=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python -u /home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py --gpus 0 --model Qwen/Qwen2.5-3B-Instruct --dataset math500 --budget 32 --n-sample 500 --seed 789 --signals prm_drop_fb_last nll_drop_fb_last --nd 4 8 16 --out-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_math500_five_seed_corrected/seed_789/math500 --fig-dir /home/youyang7/projects/LostInTheSecond/rebuttal/figures/qwen2.5_3b_instruct_math500_five_seed_corrected/seed_789/math500 --skip-phase 2 3 4 25
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: math500, 500 questions, GPUs: ['0']
+Budget B=32, signals=['prm_drop_fb_last', 'nll_drop_fb_last']
+Sampling seed: 789
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint: 0 records
+
+--- Phase 1: 8000 drafts ---
+  Shard 0 on GPU 0: 8000 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 320/320 [02:15<00:00,  2.36it/s, est. speed input: 276.67 toks/s, output: 1537.15 toks/s]
+[Seeded shard 0] draft batch 16/16
+[Seeded shard 0] Done: 8000
+Total drafts: 8000
+Total PRM records: 0
+Total logprob records: 0
+Total suffix records: 0
+
+--- Phase 5: 8000 SC (supplement; 16 drafts reused) ---
+  Shard 0 on GPU 0: 8000 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 320/320 [02:14<00:00,  2.38it/s, est. speed input: 279.12 toks/s, output: 1506.81 toks/s]
+[Seeded shard 0] fullsc batch 16/16
+[Seeded shard 0] Done: 8000
+Total SC pool: 8000 drafts + 8000 fullsc = 16000
+
+--- Evaluation ---
+
+--- Signal overhead (wall-clock) ---
+  PRM scoring         :      0.0s total | 0.0ms/sample | 0.0ms/question
+  NLL/logprob         :      0.0s total | 0.0ms/sample | 0.0ms/question
+  GPT first-error     :      0.0s total | 0.0ms/sample | 0.0ms/question
+  Draft generation    :   2822.9s total
+  Suffix generation   :      0.0s total
+  Re-extracted answers for 16000 records
+  WARNING: draft_step_tokens.json not found, using full draft_tokens for fair prefix cost
+
+Method                                   Acc      Tok/Q     TotalTok
+--------------------------------------------------------------------
+Greedy@1                              0.6200        577      288,742
+SC@8                                  0.7220       4583    2,291,452
+SC@16                                 0.7280       9158    4,579,026
+SC@32                                 0.7300      18314    9,156,770
+SC@40                                 0.7300      18314    9,156,770
+rollback_nll_drop_fb_last_nd4_ns8     0.6880       2291    1,145,385
+rollback_nll_drop_fb_last_nd4_ns8_fair   0.0000          0            0
+rollback_nll_drop_fb_last_nd8_ns4     0.7220       4583    2,291,452
+rollback_nll_drop_fb_last_nd8_ns4_fair   0.0000          0            0
+rollback_nll_drop_fb_last_nd16_ns2    0.7280       9158    4,579,026
+rollback_nll_drop_fb_last_nd16_ns2_fair   0.0000          0            0
+rollback_prm_drop_fb_last_nd4_ns8     0.6880       2291    1,145,385
+rollback_prm_drop_fb_last_nd4_ns8_fair   0.0000          0            0
+rollback_prm_drop_fb_last_nd8_ns4     0.7220       4583    2,291,452
+rollback_prm_drop_fb_last_nd8_ns4_fair   0.0000          0            0
+rollback_prm_drop_fb_last_nd16_ns2    0.7280       9158    4,579,026
+rollback_prm_drop_fb_last_nd16_ns2_fair   0.0000          0            0
+
+Saved: /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_math500_five_seed_corrected/seed_789/math500/eval_summary.json
+Figures saved to /home/youyang7/projects/LostInTheSecond/rebuttal/figures/qwen2.5_3b_instruct_math500_five_seed_corrected/seed_789/math500
+Saved table: /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_math500_five_seed_corrected/seed_789/math500/eval_summary_table.md
+Done.
+seed=789 completed in 1.57 hours
+validated seed=789: SC@32=0.7300, unique_seeds=16000
+Validated corrected SC generation complete: 789

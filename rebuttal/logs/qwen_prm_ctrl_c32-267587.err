@@ -1,0 +1,5 @@
+Waiting for 3 free C32 GPUs: 0/3
+0, 1348 MiB, 30882 MiB, 59 %
+1, 1346 MiB, 30884 MiB, 58 %
+2, 1346 MiB, 30884 MiB, 65 %
+[2026-07-27T02:55:32.996] error: *** JOB 267587 ON c32 CANCELLED AT 2026-07-27T02:55:32 DUE to SIGNAL Terminated ***

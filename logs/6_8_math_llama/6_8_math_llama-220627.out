@@ -1,0 +1,538 @@
+Running on c31
+/mnt/beegfs/youyang7/.conda/envs/fact/bin/python
+Python 3.10.18
+Wed May  6 16:10:00 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX A6000               On  |   00000000:01:00.0 Off |                  Off |
+| 30%   46C    P2            114W /  200W |    6710MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX A6000               On  |   00000000:41:00.0 Off |                  Off |
+| 30%   46C    P5             26W /  200W |       4MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX A6000               On  |   00000000:81:00.0 Off |                  Off |
+| 30%   50C    P5             23W /  200W |       4MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   3  NVIDIA RTX A6000               On  |   00000000:C1:00.0 Off |                  Off |
+| 30%   48C    P5             33W /  200W |       4MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A         1290513      C   python                                 6700MiB |
++-----------------------------------------------------------------------------------------+
+All 4 GPUs have at least 40000 MiB free.
+Wed May  6 16:10:01 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX A6000               On  |   00000000:01:00.0 Off |                  Off |
+| 30%   46C    P2            107W /  200W |    6710MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX A6000               On  |   00000000:41:00.0 Off |                  Off |
+| 30%   46C    P5             26W /  200W |       4MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX A6000               On  |   00000000:81:00.0 Off |                  Off |
+| 30%   49C    P3             23W /  200W |       4MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   3  NVIDIA RTX A6000               On  |   00000000:C1:00.0 Off |                  Off |
+| 30%   48C    P5             33W /  200W |       4MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A         1290513      C   python                                 6700MiB |
++-----------------------------------------------------------------------------------------+
+Sweep: 1 models x 5 datasets = 5 runs
+Models:   ['llama3b']
+Datasets: ['gsm8k', 'math500', 'amc2023', 'aime2024', 'olympiadbench']
+Signals:  ['prm_drop_fb_last', 'nll_drop_fb_last']
+GPUs:     1,2,3
+N-sample: 500
+
+>>> Run 1/5: llama3b x gsm8k
+
+======================================================================
+  Model: llama3b (meta-llama/Llama-3.2-3B-Instruct)
+  Dataset: gsm8k
+  Out: /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/gsm8k
+  Cmd: /mnt/beegfs/youyang7/.conda/envs/fact/bin/python /home/youyang7/projects/LostInTheSecond/scripts/6_8_budget_controlled_multisignal.py --gpus 1,2,3 --model meta-llama/Llama-3.2-3B-Instruct --dataset gsm8k --budget 32 --n-sample 500 --signals prm_drop_fb_last nll_drop_fb_last --gpt-model gpt-5.1 --gpt-max-workers 32 --out-dir /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/gsm8k --skip-phase 25 --nd 4 8 16
+======================================================================
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: gsm8k, 500 questions, GPUs: ['1', '2', '3']
+Budget B=32, signals=['prm_drop_fb_last', 'nll_drop_fb_last']
+Sampling seed: None
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint: 0 records
+
+--- Phase 1: 8000 drafts ---
+  Shard 0 on GPU 1: 2667 tasks
+  Shard 1 on GPU 2: 2667 tasks
+  Shard 2 on GPU 3: 2666 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 107/107 [00:36<00:00,  2.91it/s, est. speed input: 289.28 toks/s, output: 686.83 toks/s]
+[Shard 0] draft batch 6/6
+[Shard 0] Done: 2667
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 107/107 [00:22<00:00,  4.78it/s, est. speed input: 476.38 toks/s, output: 1017.26 toks/s]
+[Shard 1] draft batch 6/6
+[Shard 1] Done: 2667
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 106/106 [00:35<00:00,  2.97it/s, est. speed input: 297.10 toks/s, output: 642.21 toks/s]
+[Shard 2] draft batch 6/6
+[Shard 2] Done: 2666
+Total drafts: 8000
+
+--- Phase 2: 8000 PRM (Qwen/Qwen2.5-Math-PRM-7B) ---
+  Shard 0 on GPU 1: 2667 tasks
+  Shard 1 on GPU 2: 2667 tasks
+  Shard 2 on GPU 3: 2666 tasks
+  Shard 0 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 0] Done: 2667
+  Shard 1 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 1] Done: 2667
+  Shard 2 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 2] Done: 2666
+Total PRM records: 8000
+
+--- Phase 3: 8000 logprob ---
+  Shard 0 on GPU 1: 2667 tasks
+  Shard 1 on GPU 2: 2667 tasks
+  Shard 2 on GPU 3: 2666 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 3/3 [00:00<00:00, 31.74it/s, est. speed input: 8202.46 toks/s, output: 31.75 toks/s]
+[LP Shard 0] batch 334/334
+[LP Shard 0] Done: 2667
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 3/3 [00:00<00:00, 34.90it/s, est. speed input: 8891.79 toks/s, output: 34.91 toks/s]
+[LP Shard 1] batch 334/334
+[LP Shard 1] Done: 2667
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 2/2 [00:00<00:00, 35.87it/s, est. speed input: 8939.52 toks/s, output: 35.90 toks/s]
+[LP Shard 2] batch 334/334
+[LP Shard 2] Done: 2666
+Total logprob records: 8000
+
+--- Phase 4: 64000 suffix generations ---
+  Shard 0 on GPU 1: 21334 tasks
+  Shard 1 on GPU 2: 21333 tasks
+  Shard 2 on GPU 3: 21333 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 342/342 [00:22<00:00, 15.51it/s, est. speed input: 4440.71 toks/s, output: 383.90 toks/s]
+[Shard 0] suffix batch 42/42
+[Shard 0] Done: 21334
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 341/341 [00:14<00:00, 24.04it/s, est. speed input: 6871.45 toks/s, output: 531.06 toks/s] 
+[Shard 1] suffix batch 42/42
+[Shard 1] Done: 21333
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 341/341 [00:16<00:00, 20.41it/s, est. speed input: 5812.66 toks/s, output: 472.30 toks/s]
+[Shard 2] suffix batch 42/42
+[Shard 2] Done: 21333
+Total suffix records: 64000
+
+--- Phase 5: 8000 SC (supplement; 16 drafts reused) ---
+  Shard 0 on GPU 1: 2667 tasks
+  Shard 1 on GPU 2: 2667 tasks
+  Shard 2 on GPU 3: 2666 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 107/107 [00:36<00:00,  2.93it/s, est. speed input: 291.89 toks/s, output: 693.03 toks/s]
+[Shard 0] fullsc batch 6/6
+[Shard 0] Done: 2667
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 107/107 [00:21<00:00,  4.92it/s, est. speed input: 489.76 toks/s, output: 1045.84 toks/s]
+[Shard 1] fullsc batch 6/6
+[Shard 1] Done: 2667
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 106/106 [00:35<00:00,  3.00it/s, est. speed input: 299.80 toks/s, output: 648.04 toks/s]
+[Shard 2] fullsc batch 6/6
+[Shard 2] Done: 2666
+Total SC pool: 8000 drafts + 8000 fullsc = 16000
+
+--- Evaluation ---
+
+--- Signal overhead (wall-clock) ---
+  PRM scoring         :    233.4s total | 29.2ms/sample | 466.9ms/question
+  NLL/logprob         :    161.4s total | 20.2ms/sample | 322.7ms/question
+  GPT first-error     :      0.0s total | 0.0ms/sample | 0.0ms/question
+  Draft generation    :    394.6s total
+  Suffix generation   :   1669.6s total
+  Re-extracted answers for 80000 records
+  WARNING: draft_step_tokens.json not found, using full draft_tokens for fair prefix cost
+
+Method                                   Acc      Tok/Q     TotalTok
+--------------------------------------------------------------------
+Greedy@1                              0.7880        209      104,740
+SC@8                                  0.8620       1707      853,351
+SC@16                                 0.8740       3449    1,724,331
+SC@32                                 0.8740       6897    3,448,662
+SC@40                                 0.8740       6897    3,448,662
+rollback_nll_drop_fb_last_nd4_ns8     0.8560       1985      992,348
+rollback_nll_drop_fb_last_nd4_ns8_fair   0.8560       1134      567,114
+rollback_nll_drop_fb_last_nd8_ns4     0.8760       2913    1,456,360
+rollback_nll_drop_fb_last_nd8_ns4_fair   0.8760       1194      596,777
+rollback_nll_drop_fb_last_nd16_ns2    0.8760       4700    2,349,990
+rollback_nll_drop_fb_last_nd16_ns2_fair   0.8720       1251      625,659
+rollback_prm_drop_fb_last_nd4_ns8     0.8760       2660    1,330,144
+rollback_prm_drop_fb_last_nd4_ns8_fair   0.8720       1810      904,910
+rollback_prm_drop_fb_last_nd8_ns4     0.8900       3586    1,792,927
+rollback_prm_drop_fb_last_nd8_ns4_fair   0.8920       1867      933,344
+rollback_prm_drop_fb_last_nd16_ns2    0.8760       5321    2,660,582
+rollback_prm_drop_fb_last_nd16_ns2_fair   0.8860       1873      936,251
+
+Saved: /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/gsm8k/eval_summary.json
+Figures saved to /home/youyang7/projects/LostInTheSecond/figures/budget_multisignal
+Saved table: /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/gsm8k/eval_summary_table.md
+Done.
+
+  [OK] llama3b x gsm8k in 2868s (47.8min)
+
+>>> Run 2/5: llama3b x math500
+
+======================================================================
+  Model: llama3b (meta-llama/Llama-3.2-3B-Instruct)
+  Dataset: math500
+  Out: /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/math500
+  Cmd: /mnt/beegfs/youyang7/.conda/envs/fact/bin/python /home/youyang7/projects/LostInTheSecond/scripts/6_8_budget_controlled_multisignal.py --gpus 1,2,3 --model meta-llama/Llama-3.2-3B-Instruct --dataset math500 --budget 32 --n-sample 500 --signals prm_drop_fb_last nll_drop_fb_last --gpt-model gpt-5.1 --gpt-max-workers 32 --out-dir /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/math500 --skip-phase 25 --nd 4 8 16
+======================================================================
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: math500, 500 questions, GPUs: ['1', '2', '3']
+Budget B=32, signals=['prm_drop_fb_last', 'nll_drop_fb_last']
+Sampling seed: None
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint: 0 records
+
+--- Phase 1: 8000 drafts ---
+  Shard 0 on GPU 1: 2667 tasks
+  Shard 1 on GPU 2: 2667 tasks
+  Shard 2 on GPU 3: 2666 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 107/107 [00:45<00:00,  2.38it/s, est. speed input: 280.00 toks/s, output: 1585.34 toks/s]
+[Shard 0] draft batch 6/6
+[Shard 0] Done: 2667
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 107/107 [00:44<00:00,  2.41it/s, est. speed input: 284.18 toks/s, output: 1453.81 toks/s]
+[Shard 1] draft batch 6/6
+[Shard 1] Done: 2667
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 106/106 [00:43<00:00,  2.42it/s, est. speed input: 289.29 toks/s, output: 1485.68 toks/s]
+[Shard 2] draft batch 6/6
+[Shard 2] Done: 2666
+Total drafts: 8000
+
+--- Phase 2: 8000 PRM (Qwen/Qwen2.5-Math-PRM-7B) ---
+  Shard 0 on GPU 1: 2667 tasks
+  Shard 1 on GPU 2: 2667 tasks
+  Shard 2 on GPU 3: 2666 tasks
+  Shard 0 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 0] Done: 2667
+  Shard 1 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 1] Done: 2667
+  Shard 2 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 2] Done: 2666
+Total PRM records: 8000
+
+--- Phase 3: 8000 logprob ---
+  Shard 0 on GPU 1: 2667 tasks
+  Shard 1 on GPU 2: 2667 tasks
+  Shard 2 on GPU 3: 2666 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 3/3 [00:00<00:00, 12.84it/s, est. speed input: 8500.45 toks/s, output: 12.85 toks/s]
+[LP Shard 0] batch 334/334
+[LP Shard 0] Done: 2667
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 3/3 [00:00<00:00, 27.84it/s, est. speed input: 7455.46 toks/s, output: 27.85 toks/s]
+[LP Shard 1] batch 334/334
+[LP Shard 1] Done: 2667
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 2/2 [00:00<00:00,  9.66it/s, est. speed input: 8555.10 toks/s, output: 9.67 toks/s]
+[LP Shard 2] batch 334/334
+[LP Shard 2] Done: 2666
+Total logprob records: 8000
+
+--- Phase 4: 64000 suffix generations ---
+  Shard 0 on GPU 1: 21334 tasks
+  Shard 1 on GPU 2: 21333 tasks
+  Shard 2 on GPU 3: 21333 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 342/342 [01:22<00:00,  4.16it/s, est. speed input: 2300.99 toks/s, output: 1316.59 toks/s]
+[Shard 0] suffix batch 42/42
+[Shard 0] Done: 21334
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 341/341 [01:21<00:00,  4.17it/s, est. speed input: 2255.77 toks/s, output: 1271.78 toks/s]
+[Shard 1] suffix batch 42/42
+[Shard 1] Done: 21333
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 341/341 [01:22<00:00,  4.16it/s, est. speed input: 2263.18 toks/s, output: 1290.64 toks/s]
+[Shard 2] suffix batch 42/42
+[Shard 2] Done: 21333
+Total suffix records: 64000
+
+--- Phase 5: 8000 SC (supplement; 16 drafts reused) ---
+  Shard 0 on GPU 1: 2667 tasks
+  Shard 1 on GPU 2: 2667 tasks
+  Shard 2 on GPU 3: 2666 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 107/107 [00:45<00:00,  2.37it/s, est. speed input: 278.65 toks/s, output: 1577.67 toks/s]
+[Shard 0] fullsc batch 6/6
+[Shard 0] Done: 2667
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 107/107 [00:44<00:00,  2.42it/s, est. speed input: 285.73 toks/s, output: 1461.77 toks/s]
+[Shard 1] fullsc batch 6/6
+[Shard 1] Done: 2667
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 106/106 [00:43<00:00,  2.44it/s, est. speed input: 292.57 toks/s, output: 1502.50 toks/s]
+[Shard 2] fullsc batch 6/6
+[Shard 2] Done: 2666
+Total SC pool: 8000 drafts + 8000 fullsc = 16000
+
+--- Evaluation ---
+
+--- Signal overhead (wall-clock) ---
+  PRM scoring         :    385.5s total | 48.2ms/sample | 771.1ms/question
+  NLL/logprob         :    231.8s total | 29.0ms/sample | 463.7ms/question
+  GPT first-error     :      0.0s total | 0.0ms/sample | 0.0ms/question
+  Draft generation    :    652.1s total
+  Suffix generation   :   3903.5s total
+  Re-extracted answers for 80000 records
+  WARNING: draft_step_tokens.json not found, using full draft_tokens for fair prefix cost
+
+Method                                   Acc      Tok/Q     TotalTok
+--------------------------------------------------------------------
+Greedy@1                              0.3800        516      257,752
+SC@8                                  0.5200       4088    2,043,976
+SC@16                                 0.5380       8160    4,079,845
+SC@32                                 0.5380      16319    8,159,690
+SC@40                                 0.5380      16319    8,159,690
+rollback_nll_drop_fb_last_nd4_ns8     0.4940       8582    4,291,243
+rollback_nll_drop_fb_last_nd4_ns8_fair   0.4940       6508    3,254,006
+rollback_nll_drop_fb_last_nd8_ns4     0.5420      10433    5,216,263
+rollback_nll_drop_fb_last_nd8_ns4_fair   0.5420       6337    3,168,584
+rollback_nll_drop_fb_last_nd16_ns2    0.5600      14427    7,213,337
+rollback_nll_drop_fb_last_nd16_ns2_fair   0.5620       6267    3,133,492
+rollback_prm_drop_fb_last_nd4_ns8     0.5500      11594    5,797,192
+rollback_prm_drop_fb_last_nd4_ns8_fair   0.5520       9520    4,759,955
+rollback_prm_drop_fb_last_nd8_ns4     0.5740      13376    6,688,126
+rollback_prm_drop_fb_last_nd8_ns4_fair   0.5700       9281    4,640,447
+rollback_prm_drop_fb_last_nd16_ns2    0.5740      17396    8,698,027
+rollback_prm_drop_fb_last_nd16_ns2_fair   0.5800       9236    4,618,182
+
+Saved: /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/math500/eval_summary.json
+Figures saved to /home/youyang7/projects/LostInTheSecond/figures/budget_multisignal
+Saved table: /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/math500/eval_summary_table.md
+Done.
+
+  [OK] llama3b x math500 in 5832s (97.2min)
+
+>>> Run 3/5: llama3b x amc2023
+
+======================================================================
+  Model: llama3b (meta-llama/Llama-3.2-3B-Instruct)
+  Dataset: amc2023
+  Out: /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/amc2023
+  Cmd: /mnt/beegfs/youyang7/.conda/envs/fact/bin/python /home/youyang7/projects/LostInTheSecond/scripts/6_8_budget_controlled_multisignal.py --gpus 1,2,3 --model meta-llama/Llama-3.2-3B-Instruct --dataset amc2023 --budget 32 --n-sample 500 --signals prm_drop_fb_last nll_drop_fb_last --gpt-model gpt-5.1 --gpt-max-workers 32 --out-dir /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/amc2023 --skip-phase 25 --nd 4 8 16
+======================================================================
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: amc2023, 83 questions, GPUs: ['1', '2', '3']
+Budget B=32, signals=['prm_drop_fb_last', 'nll_drop_fb_last']
+Sampling seed: None
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint: 0 records
+
+--- Phase 1: 1328 drafts ---
+  Shard 0 on GPU 1: 443 tasks
+  Shard 1 on GPU 2: 443 tasks
+  Shard 2 on GPU 3: 442 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 443/443 [02:24<00:00,  3.06it/s, est. speed input: 428.24 toks/s, output: 2473.63 toks/s]
+[Shard 0] draft batch 1/1
+[Shard 0] Done: 443
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 443/443 [02:32<00:00,  2.90it/s, est. speed input: 401.54 toks/s, output: 2419.57 toks/s]
+[Shard 1] draft batch 1/1
+[Shard 1] Done: 443
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 442/442 [02:28<00:00,  2.97it/s, est. speed input: 408.56 toks/s, output: 2457.17 toks/s]
+[Shard 2] draft batch 1/1
+[Shard 2] Done: 442
+Total drafts: 1328
+
+--- Phase 2: 1328 PRM (Qwen/Qwen2.5-Math-PRM-7B) ---
+  Shard 0 on GPU 1: 443 tasks
+  Shard 1 on GPU 2: 443 tasks
+  Shard 2 on GPU 3: 442 tasks
+  Shard 0 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 0] Done: 443
+  Shard 1 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 1] Done: 443
+  Shard 2 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 2] Done: 442
+Total PRM records: 1328
+
+--- Phase 3: 1328 logprob ---
+  Shard 0 on GPU 1: 443 tasks
+  Shard 1 on GPU 2: 443 tasks
+  Shard 2 on GPU 3: 442 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 3/3 [00:00<00:00, 11.77it/s, est. speed input: 8718.33 toks/s, output: 11.77 toks/s]
+[LP Shard 0] batch 56/56
+[LP Shard 0] Done: 443
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 3/3 [00:00<00:00, 24.54it/s, est. speed input: 25541.54 toks/s, output: 16.37 toks/s]
+[LP Shard 1] batch 56/56
+[LP Shard 1] Done: 443
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 2/2 [00:00<00:00, 10.51it/s, est. speed input: 8344.70 toks/s, output: 10.52 toks/s]
+[LP Shard 2] batch 56/56
+[LP Shard 2] Done: 442
+Total logprob records: 1328
+
+--- Phase 4: 10624 suffix generations ---
+  Shard 0 on GPU 1: 3542 tasks
+  Shard 1 on GPU 2: 3541 tasks
+  Shard 2 on GPU 3: 3541 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 470/470 [01:44<00:00,  4.50it/s, est. speed input: 1959.70 toks/s, output: 1668.92 toks/s]
+[Shard 0] suffix batch 7/7
+[Shard 0] Done: 3542
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 469/469 [01:46<00:00,  4.39it/s, est. speed input: 1904.64 toks/s, output: 1737.81 toks/s]
+[Shard 1] suffix batch 7/7
+[Shard 1] Done: 3541
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 469/469 [01:43<00:00,  4.54it/s, est. speed input: 1949.51 toks/s, output: 1723.59 toks/s]
+[Shard 2] suffix batch 7/7
+[Shard 2] Done: 3541
+Total suffix records: 10624
+
+--- Phase 5: 1328 SC (supplement; 16 drafts reused) ---
+  Shard 0 on GPU 1: 443 tasks
+  Shard 1 on GPU 2: 443 tasks
+  Shard 2 on GPU 3: 442 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 443/443 [02:24<00:00,  3.06it/s, est. speed input: 429.31 toks/s, output: 2479.77 toks/s]
+[Shard 0] fullsc batch 1/1
+[Shard 0] Done: 443
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 443/443 [02:34<00:00,  2.87it/s, est. speed input: 398.47 toks/s, output: 2401.06 toks/s]
+[Shard 1] fullsc batch 1/1
+[Shard 1] Done: 443
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 442/442 [02:27<00:00,  3.00it/s, est. speed input: 412.57 toks/s, output: 2481.33 toks/s]
+[Shard 2] fullsc batch 1/1
+[Shard 2] Done: 442
+Total SC pool: 1328 drafts + 1328 fullsc = 2656
+
+--- Evaluation ---
+
+--- Signal overhead (wall-clock) ---
+  PRM scoring         :    113.7s total | 85.6ms/sample | 1369.5ms/question
+  NLL/logprob         :     97.0s total | 73.1ms/sample | 1168.9ms/question
+  GPT first-error     :      0.0s total | 0.0ms/sample | 0.0ms/question
+  Draft generation    :    208.5s total
+  Suffix generation   :   1136.6s total
+  Re-extracted answers for 13280 records
+  WARNING: draft_step_tokens.json not found, using full draft_tokens for fair prefix cost
+
+Method                                   Acc      Tok/Q     TotalTok
+--------------------------------------------------------------------
+Greedy@1                              0.2289        792       65,750
+SC@8                                  0.2651       6616      549,162
+SC@16                                 0.3494      13189    1,094,666
+SC@32                                 0.3494      26377    2,189,332
+SC@40                                 0.3494      26377    2,189,332
+rollback_nll_drop_fb_last_nd4_ns8     0.3133      16474    1,367,310
+rollback_nll_drop_fb_last_nd4_ns8_fair   0.3133      13136    1,090,289
+rollback_nll_drop_fb_last_nd8_ns4     0.3133      20080    1,666,671
+rollback_nll_drop_fb_last_nd8_ns4_fair   0.3133      13457    1,116,916
+rollback_nll_drop_fb_last_nd16_ns2    0.3373      26658    2,212,574
+rollback_nll_drop_fb_last_nd16_ns2_fair   0.3253      13469    1,117,908
+rollback_prm_drop_fb_last_nd4_ns8     0.4337      22591    1,875,031
+rollback_prm_drop_fb_last_nd4_ns8_fair   0.4337      19253    1,598,010
+rollback_prm_drop_fb_last_nd8_ns4     0.3735      26181    2,173,026
+rollback_prm_drop_fb_last_nd8_ns4_fair   0.3976      19557    1,623,271
+rollback_prm_drop_fb_last_nd16_ns2    0.3855      32817    2,723,826
+rollback_prm_drop_fb_last_nd16_ns2_fair   0.3976      19628    1,629,160
+
+Saved: /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/amc2023/eval_summary.json
+Figures saved to /home/youyang7/projects/LostInTheSecond/figures/budget_multisignal
+Saved table: /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/amc2023/eval_summary_table.md
+Done.
+
+  [OK] llama3b x amc2023 in 1778s (29.6min)
+
+>>> Run 4/5: llama3b x aime2024
+
+======================================================================
+  Model: llama3b (meta-llama/Llama-3.2-3B-Instruct)
+  Dataset: aime2024
+  Out: /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/aime2024
+  Cmd: /mnt/beegfs/youyang7/.conda/envs/fact/bin/python /home/youyang7/projects/LostInTheSecond/scripts/6_8_budget_controlled_multisignal.py --gpus 1,2,3 --model meta-llama/Llama-3.2-3B-Instruct --dataset aime2024 --budget 32 --n-sample 500 --signals prm_drop_fb_last nll_drop_fb_last --gpt-model gpt-5.1 --gpt-max-workers 32 --out-dir /mnt/beegfs/youyang7/projects/LostInSecond/results/llama_3.2_3b_instruct_budget_multisignal/aime2024 --skip-phase 25 --nd 4 8 16
+======================================================================
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: aime2024, 90 questions, GPUs: ['1', '2', '3']
+Budget B=32, signals=['prm_drop_fb_last', 'nll_drop_fb_last']
+Sampling seed: None
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint: 0 records
+
+--- Phase 1: 1440 drafts ---
+  Shard 0 on GPU 1: 480 tasks
+  Shard 1 on GPU 2: 480 tasks
+  Shard 2 on GPU 3: 480 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 480/480 [02:51<00:00,  2.80it/s, est. speed input: 431.34 toks/s, output: 2456.01 toks/s]
+[Shard 0] draft batch 1/1
+[Shard 0] Done: 480
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 480/480 [02:54<00:00,  2.75it/s, est. speed input: 424.04 toks/s, output: 2440.34 toks/s]
+[Shard 1] draft batch 1/1
+[Shard 1] Done: 480
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 480/480 [02:45<00:00,  2.90it/s, est. speed input: 448.31 toks/s, output: 2463.76 toks/s]
+[Shard 2] draft batch 1/1
+[Shard 2] Done: 480
+Total drafts: 1440
+
+--- Phase 2: 1440 PRM (Qwen/Qwen2.5-Math-PRM-7B) ---
+  Shard 0 on GPU 1: 480 tasks
+  Shard 1 on GPU 2: 480 tasks
+  Shard 2 on GPU 3: 480 tasks
+  Shard 0 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 0] Done: 480
+  Shard 1 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 1] Done: 480
+  Shard 2 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 2] Done: 480
+Total PRM records: 1440
+
+--- Phase 3: 1440 logprob ---
+  Shard 0 on GPU 1: 480 tasks
+  Shard 1 on GPU 2: 480 tasks
+  Shard 2 on GPU 3: 480 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 8/8 [00:00<00:00,  9.52it/s, est. speed input: 8584.77 toks/s, output: 9.52 toks/s]
+[LP Shard 0] batch 60/60
+[LP Shard 0] Done: 480
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 8/8 [00:00<00:00,  9.15it/s, est. speed input: 8439.78 toks/s, output: 9.15 toks/s]
+[LP Shard 1] batch 60/60
+[LP Shard 1] Done: 480
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 8/8 [00:01<00:00,  7.66it/s, est. speed input: 7100.35 toks/s, output: 7.66 toks/s]
+[LP Shard 2] batch 60/60
+[LP Shard 2] Done: 480
+Total logprob records: 1440
+
+--- Phase 4: 11520 suffix generations ---
+  Shard 0 on GPU 1: 3840 tasks
+  Shard 1 on GPU 2: 3840 tasks
+  Shard 2 on GPU 3: 3840 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 256/256 [01:25<00:00,  2.99it/s, est. speed input: 1592.33 toks/s, output: 1622.81 toks/s]
+[Shard 0] suffix batch 8/8
+[Shard 0] Done: 3840
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 256/256 [01:31<00:00,  2.79it/s, est. speed input: 1515.86 toks/s, output: 1607.39 toks/s]
+[Shard 1] suffix batch 8/8
+[Shard 1] Done: 3840
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 256/256 [01:23<00:00,  3.05it/s, est. speed input: 1672.83 toks/s, output: 1597.07 toks/s]
+[Shard 2] suffix batch 8/8
+[Shard 2] Done: 3840
+Total suffix records: 11520
+
+--- Phase 5: 1440 SC (supplement; 16 drafts reused) ---
+  Shard 0 on GPU 1: 480 tasks
+  Shard 1 on GPU 2: 480 tasks
+  Shard 2 on GPU 3: 480 tasks

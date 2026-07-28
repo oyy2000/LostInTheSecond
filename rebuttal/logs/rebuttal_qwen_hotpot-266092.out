@@ -1,0 +1,110 @@
+Host: c32
+Fri Jul 24 23:49:43 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:01:00.0 Off |                  Off |
+| 35%   62C    P2            225W /  250W |    2192MiB /  32760MiB |     82%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:02:00.0 Off |                  Off |
+| 30%   27C    P8             19W /  250W |       4MiB /  32760MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:C1:00.0 Off |                  Off |
+| 30%   26C    P8             10W /  250W |       4MiB /  32760MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A         3403024      C   python3.8                              2182MiB |
++-----------------------------------------------------------------------------------------+
+{
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "dataset": "hotpotqa",
+  "n_questions": 500,
+  "dataset_seed": 42,
+  "random_seed": 42,
+  "generation_seed": null,
+  "budget": 32,
+  "rollback_configs": [
+    [
+      4,
+      8
+    ],
+    [
+      8,
+      4
+    ],
+    [
+      16,
+      2
+    ]
+  ],
+  "strategies": [
+    "random_uniform",
+    "fixed_25",
+    "fixed_50",
+    "fixed_75",
+    "final_answer_only"
+  ],
+  "fixed_position_semantics": "target step = ceil(fraction * n_steps); retain earlier steps",
+  "temperature": 0.7,
+  "top_p": 0.95,
+  "max_tokens": 2048,
+  "final_answer_max_tokens": 128
+}
+Generating 8000 drafts
+  shard=0 gpu=0 tasks=2667
+  shard=1 gpu=1 tasks=2667
+  shard=2 gpu=2 tasks=2666
+  shard=0 exit=0
+Processed prompts:  99%|█████████▉| 106/107 [00:17<00:00,  3.11it/s, est. speed input: 432.48 toks/s, output: 1367.86 toks/s]
+Processed prompts: 100%|██████████| 107/107 [00:18<00:00,  1.90it/s, est. speed input: 406.44 toks/s, output: 1299.78 toks/s]
+Processed prompts: 100%|██████████| 107/107 [00:18<00:00,  5.72it/s, est. speed input: 406.44 toks/s, output: 1299.78 toks/s]
+[Shard 0] draft 2667/2667
+[Shard 0] Done
+  shard=1 exit=0
+Processed prompts:  97%|█████████▋| 104/107 [00:09<00:00, 10.34it/s, est. speed input: 764.24 toks/s, output: 2373.94 toks/s]
+Processed prompts:  99%|█████████▉| 106/107 [00:09<00:00, 10.04it/s, est. speed input: 761.16 toks/s, output: 2400.68 toks/s]
+Processed prompts: 100%|██████████| 107/107 [00:10<00:00, 10.25it/s, est. speed input: 730.09 toks/s, output: 2323.23 toks/s]
+[Shard 1] draft 2667/2667
+[Shard 1] Done
+  shard=2 exit=0
+Processed prompts:  97%|█████████▋| 103/106 [00:09<00:00, 10.43it/s, est. speed input: 758.28 toks/s, output: 2358.98 toks/s]
+Processed prompts:  99%|█████████▉| 105/106 [00:10<00:00,  8.37it/s, est. speed input: 742.19 toks/s, output: 2349.21 toks/s]
+Processed prompts: 100%|██████████| 106/106 [00:10<00:00, 10.09it/s, est. speed input: 716.72 toks/s, output: 2292.42 toks/s]
+[Shard 2] draft 2666/2666
+[Shard 2] Done
+Suffix tasks pending: 160000 by strategy={'random_uniform': 32000, 'fixed_25': 32000, 'fixed_50': 32000, 'fixed_75': 32000, 'final_answer_only': 32000}
+  shard=0 gpu=0 tasks=53334
+  shard=1 gpu=1 tasks=53333
+  shard=2 gpu=2 tasks=53333
+  shard=0 exit=0
+Processed prompts:  86%|████████▌ | 365/426 [00:06<00:00, 140.42it/s, est. speed input: 18784.48 toks/s, output: 244.90 toks/s]
+Processed prompts:  98%|█████████▊| 418/426 [00:06<00:00, 167.72it/s, est. speed input: 21026.82 toks/s, output: 309.87 toks/s]
+Processed prompts: 100%|██████████| 426/426 [00:06<00:00, 65.41it/s, est. speed input: 20581.18 toks/s, output: 324.88 toks/s] 
+[Shard 0] final_answer 10666/10666
+[Shard 0] Done
+  shard=1 exit=0
+Processed prompts:  48%|████▊     | 205/426 [00:06<00:03, 57.87it/s, est. speed input: 10684.93 toks/s, output: 117.40 toks/s]
+Processed prompts:  87%|████████▋ | 371/426 [00:06<00:00, 146.01it/s, est. speed input: 18853.06 toks/s, output: 252.17 toks/s]
+Processed prompts: 100%|██████████| 426/426 [00:06<00:00, 61.21it/s, est. speed input: 19174.47 toks/s, output: 311.23 toks/s] 
+[Shard 1] final_answer 10666/10666
+[Shard 1] Done
+  shard=2 exit=0
+Processed prompts:  84%|████████▍ | 360/428 [00:06<00:00, 146.60it/s, est. speed input: 18361.98 toks/s, output: 242.99 toks/s]
+Processed prompts:  98%|█████████▊| 420/428 [00:06<00:00, 179.58it/s, est. speed input: 20831.42 toks/s, output: 314.24 toks/s]
+Processed prompts: 100%|██████████| 428/428 [00:06<00:00, 64.00it/s, est. speed input: 20001.05 toks/s, output: 322.23 toks/s] 
+[Shard 2] final_answer 10668/10668
+[Shard 2] Done
+Saved results to rebuttal/results/qwen2.5_3b_instruct_position_controls/seed_42/hotpotqa
+Complete: drafts=8000 suffixes=160000

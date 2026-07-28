@@ -1,0 +1,9 @@
+Waiting for 3 free GPUs: 0/3
+0, 24315 MiB, 7915 MiB, 100 %
+1, 24321 MiB, 7909 MiB, 100 %
+2, 24281 MiB, 7949 MiB, 100 %
+Waiting for 3 free GPUs: 0/3
+0, 24315 MiB, 7915 MiB, 100 %
+1, 24321 MiB, 7909 MiB, 100 %
+2, 24281 MiB, 7949 MiB, 100 %
+[2026-07-27T02:54:38.135] error: *** JOB 267582 ON c49 CANCELLED AT 2026-07-27T02:54:38 DUE to SIGNAL Terminated ***

@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_10_run_qwen_math500_five_seed.py", line 235, in <module>
+    main()
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_10_run_qwen_math500_five_seed.py", line 186, in main
+    run_seed(
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_10_run_qwen_math500_five_seed.py", line 118, in run_seed
+    subprocess.run(command, cwd=PROJECT_ROOT, check=True)
+  File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/mnt/beegfs/youyang7/.conda/envs/fact/bin/python', '-u', '/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py', '--gpus', '0,1,2', '--model', 'Qwen/Qwen2.5-3B-Instruct', '--dataset', 'math500', '--budget', '32', '--n-sample', '500', '--seed', '456', '--signals', 'prm_drop_fb_last', 'nll_drop_fb_last', '--nd', '4', '8', '16', '--out-dir', '/home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_math500_five_seed_corrected/seed_456/math500', '--fig-dir', '/home/youyang7/projects/LostInTheSecond/rebuttal/figures/qwen2.5_3b_instruct_math500_five_seed_corrected/seed_456/math500', '--skip-phase', '25']' returned non-zero exit status 1.

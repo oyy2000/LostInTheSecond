@@ -1,0 +1,117 @@
+Host: c32
+Python: /mnt/beegfs/youyang7/.conda/envs/fact/bin/python
+Python 3.10.18
+Sun Jul 26 13:36:17 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:01:00.0 Off |                  Off |
+| 30%   49C    P2            124W /  250W |    1348MiB /  32760MiB |     59%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:02:00.0 Off |                  Off |
+| 34%   60C    P2            139W /  250W |    1346MiB /  32760MiB |     57%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX 5000 Ada Gene...    Off |   00000000:C1:00.0 Off |                  Off |
+| 38%   63C    P2            133W /  250W |    1346MiB /  32760MiB |     65%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
+|    1   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
+|    2   N/A  N/A          876153      C   /home/youyang7/bin/gg                  1334MiB |
++-----------------------------------------------------------------------------------------+
+Datasets: gsm8k amc2023 aime2024 olympiadbench 2wikimultihopqa_open
+Thresholds: NLL=0.1, PRM=0.05
+SC@32: 16 stable drafts plus 16 newly generated supplements per question
+Selected GPUs: 0,1,2
+command=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python -u /home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py --gpus 0,1,2 --model Qwen/Qwen2.5-3B-Instruct --prm-model Qwen/Qwen2.5-Math-PRM-7B --dataset gsm8k --budget 32 --n-sample 1319 --seed 42 --signals nll_drop_fb_last prm_drop_fb_last --prm-drop-threshold 0.05 --nll-drop-threshold 0.1 --logprob-batch-size 4 --nd 4 8 16 --skip-phase 25 4 --out-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42 --fig-dir /home/youyang7/projects/LostInTheSecond/rebuttal/figures/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42 --timing-mode auto --skip-eval
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Using the latest cached version of the dataset since openai/gsm8k couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'main' at /mnt/beegfs/youyang7/.cache/huggingface/datasets/openai___gsm8k/main/0.0.0/740312add88f781978c0658806c59bc2815b9866 (last modified on Sat May  2 17:38:48 2026).
+Dataset: gsm8k, 1319 questions, GPUs: ['0', '1', '2']
+Budget B=32, signals=['nll_drop_fb_last', 'prm_drop_fb_last']
+Sampling seed: 42
+NLL logprob batch size: 4
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint union: 0 records (0 local)
+
+--- Phase 1: 21104 drafts ---
+  Shard 0 on GPU 0: 7035 tasks
+  Shard 1 on GPU 1: 7035 tasks
+  Shard 2 on GPU 2: 7034 tasks
+  Shard 0 exit=0: Processed prompts: 100%|██████████| 379/379 [01:07<00:00,  5.64it/s, est. speed input: 623.57 toks/s, output: 1607.04 toks/s]
+[Seeded shard 0] draft batch 14/14
+[Seeded shard 0] Done: 7035
+  Shard 1 exit=0: Processed prompts: 100%|██████████| 379/379 [01:06<00:00,  5.71it/s, est. speed input: 633.06 toks/s, output: 1651.22 toks/s]
+[Seeded shard 1] draft batch 14/14
+[Seeded shard 1] Done: 7035
+  Shard 2 exit=0: Processed prompts: 100%|██████████| 378/378 [00:36<00:00, 10.37it/s, est. speed input: 1143.06 toks/s, output: 2977.33 toks/s]
+[Seeded shard 2] draft batch 14/14
+[Seeded shard 2] Done: 7034
+Total drafts: 21104
+
+--- Phase 2: 21104 PRM (Qwen/Qwen2.5-Math-PRM-7B) ---
+  Shard 0 on GPU 0: 7035 tasks
+  Shard 1 on GPU 1: 7035 tasks
+  Shard 2 on GPU 2: 7034 tasks
+  Shard 0 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 0] Done: 7035
+  Shard 1 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 1] Done: 7035
+  Shard 2 exit=0: past_key_values should not be None in from_legacy_cache()
+We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
+[PRM Shard 2] Done: 7034
+Total PRM records: 21104
+
+--- Phase 3: 21104 logprob ---
+  Shard 0 on GPU 0: 7035 tasks
+  Shard 1 on GPU 1: 7035 tasks
+  Shard 2 on GPU 2: 7034 tasks
+  Shard 0 exit=1: [rank0]: torch.OutOfMemoryError: Error in model execution (input dumped to /tmp/err_execute_model_input_20260726-140046.pkl): CUDA out of memory. Tried to allocate 3.87 GiB. GPU 0 has a total capacity of 31.47 GiB of which 3.16 GiB is free. Process 876153 has 1.30 GiB memory in use. Including non-PyTorch memory, this process has 26.99 GiB memory in use. Of the allocated memory 26.57 GiB is allocated by PyTorch, and 58.91 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+Processed prompts:   0%|          | 0/4 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]
+elf._run_engine(use_tqdm=use_tqdm)
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/entrypoints/llm.py", line 879, in _run_engine
+[rank0]:     step_outputs = self.llm_engine.step()
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/engine/llm_engine.py", line 1386, in step
+[rank0]:     outputs = self.model_executor.execute_model(
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/executor/gpu_executor.py", line 134, in execute_model
+[rank0]:     output = self.driver_worker.execute_model(execute_model_req)
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/worker/worker_base.py", line 327, in execute_model
+[rank0]:     output = self.model_runner.execute_model(
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+[rank0]:     return func(*args, **kwargs)
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/worker/model_runner_base.py", line 152, in _wrapper
+[rank0]:     raise type(err)(
+[rank0]: torch.OutOfMemoryError: Error in model execution (input dumped to /tmp/err_execute_model_input_20260726-140046.pkl): CUDA out of memory. Tried to allocate 3.87 GiB. GPU 0 has a total capacity of 31.47 GiB of which 3.16 GiB is free. Process 876153 has 1.30 GiB memory in use. Including non-PyTorch memory, this process has 26.99 GiB memory in use. Of the allocated memory 26.57 GiB is allocated by PyTorch, and 58.91 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+Processed prompts:   0%|          | 0/4 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]
+
+Traceback (most recent call last):
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_17_run_nll_prm_threshold_sweep.py", line 509, in <module>
+    main()
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_17_run_nll_prm_threshold_sweep.py", line 446, in main
+    run_dataset(
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_17_run_nll_prm_threshold_sweep.py", line 316, in run_dataset
+    shared_dir = prepare_shared(
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_17_run_nll_prm_threshold_sweep.py", line 203, in prepare_shared
+    run_command(shared_command, dry_run)
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_17_run_nll_prm_threshold_sweep.py", line 154, in run_command
+    subprocess.run(command, cwd=PROJECT_ROOT, check=True)
+  File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/mnt/beegfs/youyang7/.conda/envs/fact/bin/python', '-u', '/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py', '--gpus', '0,1,2', '--model', 'Qwen/Qwen2.5-3B-Instruct', '--prm-model', 'Qwen/Qwen2.5-Math-PRM-7B', '--dataset', 'gsm8k', '--budget', '32', '--n-sample', '1319', '--seed', '42', '--signals', 'nll_drop_fb_last', 'prm_drop_fb_last', '--prm-drop-threshold', '0.05', '--nll-drop-threshold', '0.1', '--logprob-batch-size', '4', '--nd', '4', '8', '16', '--skip-phase', '25', '4', '--out-dir', '/home/youyang7/projects/LostInTheSecond/rebuttal/results/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42', '--fig-dir', '/home/youyang7/projects/LostInTheSecond/rebuttal/figures/qwen2.5_3b_instruct_nll_0p1_prm_0p05_sc32_recomputed/seed_42/gsm8k/_shared_seed42', '--timing-mode', 'auto', '--skip-eval']' returned non-zero exit status 1.

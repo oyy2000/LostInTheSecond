@@ -1,0 +1,89 @@
+host=c31
+dataset=math500
+config=rebuttal/configs/6_8_deepseek_r1_7b_qwen.json
+python=/mnt/beegfs/youyang7/.conda/envs/fact/bin/python
+Python 3.10.18
+Sun Jul 26 00:58:06 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX A6000               On  |   00000000:01:00.0 Off |                  Off |
+| 30%   54C    P2            132W /  200W |   46345MiB /  49140MiB |    100%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX A6000               On  |   00000000:41:00.0 Off |                  Off |
+| 30%   48C    P2            132W /  200W |   37282MiB /  49140MiB |     96%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX A6000               On  |   00000000:81:00.0 Off |                  Off |
+| 30%   28C    P8             18W /  200W |     814MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   3  NVIDIA RTX A6000               On  |   00000000:C1:00.0 Off |                  Off |
+| 30%   26C    P8              7W /  200W |     814MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A          423534      C   python                                36744MiB |
+|    0   N/A  N/A          707540      C   python                                 9586MiB |
+|    1   N/A  N/A          423534      C   python                                  264MiB |
+|    1   N/A  N/A          707540      C   python                                  264MiB |
+|    1   N/A  N/A          751281      C   python                                36732MiB |
+|    2   N/A  N/A          423534      C   python                                  264MiB |
+|    2   N/A  N/A          707540      C   python                                  264MiB |
+|    2   N/A  N/A          751281      C   python                                  264MiB |
+|    3   N/A  N/A          423534      C   python                                  264MiB |
+|    3   N/A  N/A          707540      C   python                                  264MiB |
+|    3   N/A  N/A          751281      C   python                                  264MiB |
++-----------------------------------------------------------------------------------------+
+Experiment: deepseek_r1_7b_qwen_budget32_multisignal_c31
+Dataset: math500
+Samples: 500
+Model: deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
+PRM: Qwen/Qwen2.5-Math-PRM-7B
+Signals: ['nll_drop_fb_last', 'prm_drop_fb_last']
+Budget: 32; nd: [4, 8, 16]
+Seed: 42; GPUs: 0,1,2,3
+Output: /home/youyang7/projects/LostInTheSecond/rebuttal/results/deepseek_r1_distill_qwen_7b_budget_multisignal/c31/seed_42/math500
+
+[1/5] /mnt/beegfs/youyang7/.conda/envs/fact/bin/python /home/youyang7/projects/LostInTheSecond/scripts/6_8_budget_controlled_multisignal.py --gpus 0,1,2,3 --model deepseek-ai/DeepSeek-R1-Distill-Qwen-7B --dataset math500 --budget 32 --n-sample 500 --signals nll_drop_fb_last prm_drop_fb_last --prm-model Qwen/Qwen2.5-Math-PRM-7B --nd 4 8 16 --seed 42 --out-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/deepseek_r1_distill_qwen_7b_budget_multisignal/c31/seed_42/math500 --fig-dir /home/youyang7/projects/LostInTheSecond/rebuttal/results/deepseek_r1_distill_qwen_7b_budget_multisignal/c31/seed_42/math500
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Dataset: math500, 500 questions, GPUs: ['0', '1', '2', '3']
+Budget B=32, signals=['nll_drop_fb_last', 'prm_drop_fb_last']
+Sampling seed: 42
+PRM model: Qwen/Qwen2.5-Math-PRM-7B
+Existing checkpoint: 0 records
+
+--- Phase 1: 8000 drafts ---
+  Shard 0 on GPU 1: 2000 tasks
+  Shard 1 on GPU 2: 2000 tasks
+  Shard 2 on GPU 3: 2000 tasks
+  Shard 3 on GPU 1: 2000 tasks
+  Shard 0 exit=1: [rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/torch/utils/_device.py", line 79, in __torch_function__
+[rank0]:     return func(*args, **kwargs)
+[rank0]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 32.00 MiB. GPU 0 has a total capacity of 47.40 GiB of which 4.31 MiB is free. Process 423534 has 264.00 MiB memory in use. Process 707540 has 264.00 MiB memory in use. Process 751281 has 35.87 GiB memory in use. Including non-PyTorch memory, this process has 10.98 GiB memory in use. Of the allocated memory 10.64 GiB is allocated by PyTorch, and 47.01 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+_executor/models/qwen2.py", line 250, in <lambda>
+[rank0]:     lambda prefix: Qwen2DecoderLayer(config=config,
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/model_executor/models/qwen2.py", line 175, in __init__
+[rank0]:     self.self_attn = Qwen2Attention(
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/model_executor/models/qwen2.py", line 118, in __init__
+[rank0]:     self.qkv_proj = QKVParallelLinear(
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/model_executor/layers/linear.py", line 681, in __init__
+[rank0]:     super().__init__(input_size=input_size,
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/model_executor/layers/linear.py", line 304, in __init__
+[rank0]:     self.quant_method.create_weights(
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/vllm/model_executor/layers/linear.py", line 122, in create_weights
+[rank0]:     weight = Parameter(torch.empty(sum(output_partition_sizes),
+[rank0]:   File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/torch/utils/_device.py", line 79, in __torch_function__
+[rank0]:     return func(*args, **kwargs)
+[rank0]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 32.00 MiB. GPU 0 has a total capacity of 47.40 GiB of which 4.31 MiB is free. Process 423534 has 264.00 MiB memory in use. Process 707540 has 264.00 MiB memory in use. Process 751281 has 35.87 GiB memory in use. Including non-PyTorch memory, this process has 10.98 GiB memory in use. Of the allocated memory 10.64 GiB is allocated by PyTorch, and 47.01 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+

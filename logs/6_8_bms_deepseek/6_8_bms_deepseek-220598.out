@@ -1,0 +1,468 @@
+Running on c30
+/mnt/beegfs/youyang7/.conda/envs/fact/bin/python
+Python 3.10.18
+Wed May  6 14:40:47 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX A6000               On  |   00000000:01:00.0 Off |                  Off |
+| 30%   31C    P8             24W /  200W |   36972MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX A6000               On  |   00000000:41:00.0 Off |                  Off |
+| 30%   31C    P8             27W /  200W |   36976MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX A6000               On  |   00000000:81:00.0 Off |                  Off |
+| 30%   31C    P8             28W /  200W |   36976MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   3  NVIDIA RTX A6000               On  |   00000000:C1:00.0 Off |                  Off |
+| 30%   29C    P8             19W /  200W |   36898MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A          965701      C   .../dhettik/Python38/bin/python3      36944MiB |
+|    1   N/A  N/A          965701      C   .../dhettik/Python38/bin/python3      36948MiB |
+|    2   N/A  N/A          965701      C   .../dhettik/Python38/bin/python3      36948MiB |
+|    3   N/A  N/A          965701      C   .../dhettik/Python38/bin/python3      36870MiB |
++-----------------------------------------------------------------------------------------+
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 14:40:49 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 14:45:49 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 14:50:49 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 14:55:49 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 15:00:51 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 15:05:51 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 15:10:52 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 15:15:52 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 15:20:52 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 15:25:52 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 15:30:53 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 15:35:53 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 15:40:53 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 15:45:53 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 15:50:54 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 15:55:54 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 16:00:54 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 16:05:54 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 16:10:55 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 16:15:55 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 16:20:55 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 16:25:55 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 16:30:55 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 16:35:56 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 16:40:56 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 16:45:56 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 16:50:56 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 16:55:57 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 17:00:57 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 17:05:57 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 17:10:57 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 17:15:57 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 17:20:58 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 17:25:58 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 17:30:58 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 17:35:58 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 17:40:59 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 17:45:59 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 17:50:59 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 17:56:01 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 18:01:02 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 18:06:02 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 18:11:02 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 18:16:03 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 18:21:03 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 18:26:03 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 18:31:03 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 18:36:04 EDT 2026
+0, 36972 MiB, 11569 MiB, 0 %
+1, 36976 MiB, 11565 MiB, 0 %
+2, 36976 MiB, 11565 MiB, 0 %
+3, 36898 MiB, 11643 MiB, 0 %
+Waiting for free GPUs: 3/4 above 40000 MiB at Wed May  6 18:41:04 EDT 2026
+0, 36710 MiB, 11831 MiB, 7 %
+1, 290 MiB, 48251 MiB, 0 %
+2, 290 MiB, 48251 MiB, 0 %
+3, 290 MiB, 48251 MiB, 0 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 18:46:04 EDT 2026
+0, 36972 MiB, 11569 MiB, 83 %
+1, 36976 MiB, 11565 MiB, 67 %
+2, 36978 MiB, 11563 MiB, 62 %
+3, 36896 MiB, 11645 MiB, 53 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 18:51:04 EDT 2026
+0, 36972 MiB, 11569 MiB, 63 %
+1, 36976 MiB, 11565 MiB, 35 %
+2, 36978 MiB, 11563 MiB, 34 %
+3, 36896 MiB, 11645 MiB, 33 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 18:56:05 EDT 2026
+0, 36972 MiB, 11569 MiB, 88 %
+1, 36976 MiB, 11565 MiB, 54 %
+2, 36978 MiB, 11563 MiB, 60 %
+3, 36896 MiB, 11645 MiB, 60 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 19:01:05 EDT 2026
+0, 36972 MiB, 11569 MiB, 60 %
+1, 36976 MiB, 11565 MiB, 41 %
+2, 36978 MiB, 11563 MiB, 22 %
+3, 36896 MiB, 11645 MiB, 47 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 19:06:05 EDT 2026
+0, 36972 MiB, 11569 MiB, 80 %
+1, 36976 MiB, 11565 MiB, 58 %
+2, 36978 MiB, 11563 MiB, 74 %
+3, 36896 MiB, 11645 MiB, 77 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 19:11:05 EDT 2026
+0, 36972 MiB, 11569 MiB, 60 %
+1, 36976 MiB, 11565 MiB, 36 %
+2, 36978 MiB, 11563 MiB, 32 %
+3, 36896 MiB, 11645 MiB, 34 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 19:16:06 EDT 2026
+0, 36972 MiB, 11569 MiB, 88 %
+1, 36976 MiB, 11565 MiB, 74 %
+2, 36978 MiB, 11563 MiB, 58 %
+3, 36896 MiB, 11645 MiB, 72 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 19:21:06 EDT 2026
+0, 36972 MiB, 11569 MiB, 88 %
+1, 36976 MiB, 11565 MiB, 32 %
+2, 36978 MiB, 11563 MiB, 33 %
+3, 36896 MiB, 11645 MiB, 32 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 19:26:08 EDT 2026
+0, 36972 MiB, 11569 MiB, 78 %
+1, 36976 MiB, 11565 MiB, 68 %
+2, 36978 MiB, 11563 MiB, 53 %
+3, 36896 MiB, 11645 MiB, 53 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 19:31:12 EDT 2026
+0, 36972 MiB, 11569 MiB, 81 %
+1, 36976 MiB, 11565 MiB, 64 %
+2, 36978 MiB, 11563 MiB, 76 %
+3, 36896 MiB, 11645 MiB, 50 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 19:36:13 EDT 2026
+0, 36972 MiB, 11569 MiB, 63 %
+1, 36976 MiB, 11565 MiB, 79 %
+2, 36978 MiB, 11563 MiB, 62 %
+3, 36896 MiB, 11645 MiB, 63 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 19:41:13 EDT 2026
+0, 36972 MiB, 11569 MiB, 88 %
+1, 36976 MiB, 11565 MiB, 54 %
+2, 36978 MiB, 11563 MiB, 70 %
+3, 36896 MiB, 11645 MiB, 60 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 19:46:14 EDT 2026
+0, 36972 MiB, 11569 MiB, 78 %
+1, 36976 MiB, 11565 MiB, 58 %
+2, 36978 MiB, 11563 MiB, 75 %
+3, 36896 MiB, 11645 MiB, 52 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 19:51:14 EDT 2026
+0, 36972 MiB, 11569 MiB, 76 %
+1, 36976 MiB, 11565 MiB, 77 %
+2, 36978 MiB, 11563 MiB, 71 %
+3, 36896 MiB, 11645 MiB, 65 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 19:56:14 EDT 2026
+0, 36972 MiB, 11569 MiB, 76 %
+1, 36976 MiB, 11565 MiB, 50 %
+2, 36978 MiB, 11563 MiB, 59 %
+3, 36896 MiB, 11645 MiB, 65 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 20:01:14 EDT 2026
+0, 36972 MiB, 11569 MiB, 75 %
+1, 36976 MiB, 11565 MiB, 54 %
+2, 36978 MiB, 11563 MiB, 63 %
+3, 36896 MiB, 11645 MiB, 58 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 20:06:15 EDT 2026
+0, 36972 MiB, 11569 MiB, 61 %
+1, 36976 MiB, 11565 MiB, 31 %
+2, 36978 MiB, 11563 MiB, 32 %
+3, 36896 MiB, 11645 MiB, 36 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 20:11:15 EDT 2026
+0, 36972 MiB, 11569 MiB, 81 %
+1, 36976 MiB, 11565 MiB, 63 %
+2, 36978 MiB, 11563 MiB, 70 %
+3, 36896 MiB, 11645 MiB, 77 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 20:16:15 EDT 2026
+0, 36972 MiB, 11569 MiB, 65 %
+1, 36976 MiB, 11565 MiB, 34 %
+2, 36978 MiB, 11563 MiB, 32 %
+3, 36896 MiB, 11645 MiB, 35 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 20:21:15 EDT 2026
+0, 36972 MiB, 11569 MiB, 87 %
+1, 36976 MiB, 11565 MiB, 74 %
+2, 36978 MiB, 11563 MiB, 56 %
+3, 36896 MiB, 11645 MiB, 74 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 20:26:15 EDT 2026
+0, 36972 MiB, 11569 MiB, 78 %
+1, 36976 MiB, 11565 MiB, 58 %
+2, 36978 MiB, 11563 MiB, 71 %
+3, 36896 MiB, 11645 MiB, 48 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 20:31:16 EDT 2026
+0, 36972 MiB, 11569 MiB, 62 %
+1, 36976 MiB, 11565 MiB, 32 %
+2, 36978 MiB, 11563 MiB, 33 %
+3, 36896 MiB, 11645 MiB, 35 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 20:36:16 EDT 2026
+0, 36972 MiB, 11569 MiB, 83 %
+1, 36976 MiB, 11565 MiB, 66 %
+2, 36978 MiB, 11563 MiB, 67 %
+3, 36896 MiB, 11645 MiB, 76 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 20:41:16 EDT 2026
+0, 36972 MiB, 11569 MiB, 61 %
+1, 36976 MiB, 11565 MiB, 35 %
+2, 36978 MiB, 11563 MiB, 32 %
+3, 36896 MiB, 11645 MiB, 32 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 20:46:16 EDT 2026
+0, 36972 MiB, 11569 MiB, 87 %
+1, 36976 MiB, 11565 MiB, 77 %
+2, 36978 MiB, 11563 MiB, 59 %
+3, 36896 MiB, 11645 MiB, 74 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 20:51:16 EDT 2026
+0, 36972 MiB, 11569 MiB, 64 %
+1, 36976 MiB, 11565 MiB, 32 %
+2, 36978 MiB, 11563 MiB, 36 %
+3, 36896 MiB, 11645 MiB, 35 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 20:56:17 EDT 2026
+0, 36972 MiB, 11569 MiB, 88 %
+1, 36976 MiB, 11565 MiB, 68 %
+2, 36978 MiB, 11563 MiB, 51 %
+3, 36896 MiB, 11645 MiB, 61 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 21:01:17 EDT 2026
+0, 36972 MiB, 11569 MiB, 60 %
+1, 36976 MiB, 11565 MiB, 34 %
+2, 36978 MiB, 11563 MiB, 32 %
+3, 36896 MiB, 11645 MiB, 32 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 21:06:17 EDT 2026
+0, 36972 MiB, 11569 MiB, 77 %
+1, 36976 MiB, 11565 MiB, 52 %
+2, 36978 MiB, 11563 MiB, 63 %
+3, 36896 MiB, 11645 MiB, 50 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 21:11:17 EDT 2026
+0, 36972 MiB, 11569 MiB, 63 %
+1, 36976 MiB, 11565 MiB, 32 %
+2, 36978 MiB, 11563 MiB, 32 %
+3, 36896 MiB, 11645 MiB, 33 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 21:16:17 EDT 2026
+0, 36972 MiB, 11569 MiB, 88 %
+1, 36976 MiB, 11565 MiB, 74 %
+2, 36978 MiB, 11563 MiB, 62 %
+3, 36896 MiB, 11645 MiB, 70 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 21:21:18 EDT 2026
+0, 36972 MiB, 11569 MiB, 63 %
+1, 36976 MiB, 11565 MiB, 32 %
+2, 36978 MiB, 11563 MiB, 35 %
+3, 36896 MiB, 11645 MiB, 37 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 21:26:18 EDT 2026
+0, 36972 MiB, 11569 MiB, 75 %
+1, 36976 MiB, 11565 MiB, 75 %
+2, 36978 MiB, 11563 MiB, 63 %
+3, 36896 MiB, 11645 MiB, 69 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 21:31:18 EDT 2026
+0, 36972 MiB, 11569 MiB, 61 %
+1, 36976 MiB, 11565 MiB, 35 %
+2, 36978 MiB, 11563 MiB, 32 %
+3, 36896 MiB, 11645 MiB, 32 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 21:36:18 EDT 2026
+0, 36972 MiB, 11569 MiB, 86 %
+1, 36976 MiB, 11565 MiB, 64 %
+2, 36978 MiB, 11563 MiB, 56 %
+3, 36896 MiB, 11645 MiB, 59 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 21:41:18 EDT 2026
+0, 36972 MiB, 11569 MiB, 60 %
+1, 36976 MiB, 11565 MiB, 32 %
+2, 36978 MiB, 11563 MiB, 35 %
+3, 36896 MiB, 11645 MiB, 34 %
+Waiting for free GPUs: 0/4 above 40000 MiB at Wed May  6 21:46:19 EDT 2026
+0, 36972 MiB, 11569 MiB, 84 %
+1, 36976 MiB, 11565 MiB, 67 %
+2, 36978 MiB, 11563 MiB, 74 %
+3, 36896 MiB, 11645 MiB, 57 %

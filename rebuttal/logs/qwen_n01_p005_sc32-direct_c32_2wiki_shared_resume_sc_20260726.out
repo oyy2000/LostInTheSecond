@@ -1,0 +1,30 @@
+Sampling mode: deterministic per-request seeds (SHA-256 schema per-request-v1)
+Filtered ROLLBACK_CONFIGS by --nd [4, 8, 16]: [(4, 8), (8, 4), (16, 2)]
+Using the latest cached version of the dataset since scholarly-shadows-syndicate/2WikiMultiHopQA couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /mnt/beegfs/youyang7/.cache/huggingface/datasets/scholarly-shadows-syndicate___2_wiki_multi_hop_qa/default/0.0.0/612bc5039a457880d9e7d84c3b0a4cf154b70e4f (last modified on Wed May  6 14:32:04 2026).
+Traceback (most recent call last):
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py", line 77, in <module>
+    main()
+  File "/home/youyang7/projects/LostInTheSecond/rebuttal/scripts/6_8_budget_controlled_multisignal_seeded.py", line 72, in main
+    pipeline.main()
+  File "/home/youyang7/projects/LostInTheSecond/scripts/6_8_budget_controlled_multisignal.py", line 1471, in main
+    questions = load_dataset_by_name(
+  File "/home/youyang7/projects/LostInTheSecond/src/sweep_datasets.py", line 285, in load_dataset_by_name
+    return norm_loaders[key](n_sample, seed)
+  File "/home/youyang7/projects/LostInTheSecond/src/sweep_datasets.py", line 170, in _load_2wikimultihopqa_open
+    ds = hf_load("scholarly-shadows-syndicate/2WikiMultiHopQA",
+  File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/datasets/load.py", line 1397, in load_dataset
+    builder_instance = load_dataset_builder(
+  File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/datasets/load.py", line 1171, in load_dataset_builder
+    builder_instance: DatasetBuilder = builder_cls(
+  File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/datasets/packaged_modules/cache/cache.py", line 133, in __init__
+    super().__init__(
+  File "/mnt/beegfs/youyang7/.conda/envs/fact/lib/python3.10/site-packages/datasets/builder.py", line 390, in __init__
+    with FileLock(lock_path):
+  File "/mnt/beegfs/youyang7/.local/lib/python3.10/site-packages/filelock/_api.py", line 376, in __enter__
+    self.acquire()
+  File "/mnt/beegfs/youyang7/.local/lib/python3.10/site-packages/filelock/_api.py", line 332, in acquire
+    self._acquire()
+  File "/mnt/beegfs/youyang7/.local/lib/python3.10/site-packages/filelock/_unix.py", line 44, in _acquire
+    fd = os.open(self.lock_file, open_flags, self._context.mode)
+OSError: [Errno 30] Read-only file system: '/mnt/beegfs/youyang7/.cache/huggingface/datasets/_mnt_beegfs_youyang7_.cache_huggingface_datasets_scholarly-shadows-syndicate___2_wiki_multi_hop_qa_default_0.0.0_612bc5039a457880d9e7d84c3b0a4cf154b70e4f.lock'
